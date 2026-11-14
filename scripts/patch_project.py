@@ -880,10 +880,8 @@ seed_anchor = '''    val dateFmt = remember { SimpleDateFormat("dd.MM.yyyy · HH
 
     PageColumn {'''
 seed_block = '''    val dateFmt = remember { SimpleDateFormat("dd.MM.yyyy · HH:mm", Locale.getDefault()) }
-    var starterProgramsSeeded by remember { mutableStateOf(false) }
-    LaunchedEffect(programs.isEmpty()) {
-        if (programs.isEmpty() && !starterProgramsSeeded) {
-            starterProgramsSeeded = true
+    LaunchedEffect(Unit) {
+            val existingProgramNames = programs.map { it.name }.toSet()
             val starters = listOf(
                 Triple(
                     "Фулбоди · старт 3 раза в неделю",
@@ -930,7 +928,7 @@ seed_block = '''    val dateFmt = remember { SimpleDateFormat("dd.MM.yyyy · HH:
                     )
                 )
             )
-            starters.forEachIndexed { programIndex, starter ->
+            starters.filterNot { it.first in existingProgramNames }.forEach { starter ->
                 val programId = UUID.randomUUID().toString()
                 dao.saveProgram(WorkoutProgramEntity(
                     id = programId,
@@ -951,8 +949,6 @@ seed_block = '''    val dateFmt = remember { SimpleDateFormat("dd.MM.yyyy · HH:
                     ))
                 }
             }
-        }
-    }
 
     PageColumn {'''
 if seed_anchor not in workout_text:
