@@ -290,12 +290,16 @@ if gradle_file is None:
     raise SystemExit("App Gradle file not found")
 gradle_text = gradle_file.read_text()
 match = re.search(r"versionCode\\s*(?:=\\s*)?(\\d+)", gradle_text)
-if not match:
-    raise SystemExit("versionCode not found in app Gradle file")
-old_code = int(match.group(1))
-gradle_text = gradle_text[:match.start(1)] + str(old_code + 1) + gradle_text[match.end(1):]
+if match:
+    old_code = int(match.group(1))
+    gradle_text = gradle_text[:match.start(1)] + str(old_code + 1) + gradle_text[match.end(1):]
+else:
+    old_code = 1
+    if "defaultConfig {" not in gradle_text:
+        raise SystemExit("defaultConfig block not found in app Gradle file")
+    gradle_text = gradle_text.replace("defaultConfig {", "defaultConfig {\\n        versionCode = 2\\n        versionName = \"0.9\"", 1)
 name_match = re.search(r'versionName\\s*(?:=\\s*)?"([^"]+)"', gradle_text)
-if name_match:
+if name_match and match:
     current_name = name_match.group(1)
     parts = current_name.split(".")
     try:
@@ -304,7 +308,5 @@ if name_match:
     except ValueError:
         next_name = current_name + ".1"
     gradle_text = gradle_text[:name_match.start(1)] + next_name + gradle_text[name_match.end(1):]
-else:
-    gradle_text = re.sub(r"(versionCode\\s*(?:=\\s*)?\\d+)", r'\\1\\n        versionName = "0.9"', gradle_text, count=1)
 gradle_file.write_text(gradle_text)
 print(f"Version bumped: versionCode {old_code} -> {old_code + 1}; package id preserved.")
