@@ -308,7 +308,29 @@ if name_match and match:
     except ValueError:
         next_name = current_name + ".1"
     gradle_text = gradle_text[:name_match.start(1)] + next_name + gradle_text[name_match.end(1):]
+# Force the debug build to use the cached, persistent keystore. Without this,
+# Gradle may generate a fresh debug certificate and Android rejects updates.
+if 'signingConfigs.getByName("stableDebug")' not in gradle_text:
+    signing_block = '''
+    signingConfigs {
+        create("stableDebug") {
+            storeFile = file(System.getProperty("user.home") + "/.android/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+    buildTypes {
+        getByName("debug") {
+            signingConfig = signingConfigs.getByName("stableDebug")
+        }
+    }
+'''
+    gradle_text = gradle_text.replace("    buildFeatures { compose = true }", signing_block + "    buildFeatures { compose = true }", 1)
+if 'applicationId = "com.lukyanovskykach"' not in gradle_text:
+    raise SystemExit("Unexpected applicationId; refusing to change package identity")
 gradle_file.write_text(gradle_text)
+print("Stable debug signing config applied using the persistent GitHub Actions keystore.")
 print(f"Version bumped: versionCode {old_code} -> {old_code + 1}; package id preserved.")
 
 
