@@ -791,3 +791,21 @@ screens.write_text(screens_text)
 assert 'R.drawable.body_silhouette' in screens_text
 assert 'Canvas(Modifier.weight(0.8f).height(280.dp))' not in screens_text
 print("DASHBOARD SILHOUETTE: supplied outline installed as tinted vector drawable. TODAY PLAN: removed.")
+
+
+# Ensure required Compose image imports are present regardless of source import ordering.
+screens_text = screens.read_text()
+required_image_imports = [
+    "import androidx.compose.ui.res.painterResource",
+    "import androidx.compose.ui.layout.ContentScale",
+    "import androidx.compose.ui.graphics.ColorFilter"
+]
+package_line = "package com.lukyanovskykach.ui.screens\n"
+if package_line not in screens_text:
+    raise SystemExit("Screens package declaration not found while adding image imports")
+missing_imports = [line for line in required_image_imports if line not in screens_text]
+if missing_imports:
+    screens_text = screens_text.replace(package_line, package_line + "\n".join(missing_imports) + "\n", 1)
+screens.write_text(screens_text)
+assert all(line in screens_text for line in required_image_imports)
+print("Compose image imports verified.")
