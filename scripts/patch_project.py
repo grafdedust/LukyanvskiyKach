@@ -498,6 +498,10 @@ gradle_file.write_text(gradle_text)
 assert 'nav.popBackStack("home", inclusive = false)' in app_text, "Home navigation patch missing"
 assert 'fillMaxHeight(0.90f)' in n, "Large note editor patch missing"
 assert 'TextDecoration.LineThrough' in n and 'Checkbox(checked = task.isCompleted' in n, "Task checklist behavior missing"
+task_debug_index = n.find("Checkbox(checked = task.isCompleted")
+if task_debug_index >= 0:
+    print("TASK ROW SOURCE INSPECTION:")
+    print(n[max(0, task_debug_index-1800):task_debug_index+2800])
 assert 'var themeMode by remember' in theme_text and 'TelegramLight' in theme_text, "Theme switching patch missing"
 assert 'setApplicationLocales' in settings_text, "Language locale switch missing"
 print("FEATURE ASSERTIONS: navigation, light/dark palettes, large note editor, checklist and locale selector present.")
