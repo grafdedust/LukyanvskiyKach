@@ -1252,6 +1252,15 @@ if "var detailProgram" not in wt:
         '    var selected by remember { mutableStateOf<WorkoutProgramEntity?>(null) }\n    var detailProgram by remember { mutableStateOf<WorkoutProgramEntity?>(null) }\n    var confirmDeleteProgram by remember { mutableStateOf<WorkoutProgramEntity?>(null) }',
         1
     )
+# Rework workout program cards: accent title, delete icon + start row, full-width add button below.
+wt = wt.replace(
+    'TextButton(onClick = { confirmDeleteProgram = program }) { Text("Удалить", color = MaterialTheme.colorScheme.error) }',
+    'IconButton(onClick = { confirmDeleteProgram = program }) { Icon(Icons.Default.Delete, contentDescription = "Удалить программу", tint = MaterialTheme.colorScheme.error) }',
+    1
+)
+# Ensure delete icon import exists.
+if "import androidx.compose.material.icons.filled.Delete" not in wt:
+    wt = wt.replace("import androidx.compose.material.icons.filled.Add", "import androidx.compose.material.icons.filled.Add\\nimport androidx.compose.material.icons.filled.Delete", 1)
 # Make program title open a dedicated exercise list.
 wt = wt.replace(
     'Text(program.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)',
