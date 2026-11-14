@@ -1536,3 +1536,33 @@ for source_file in base.rglob("*.kt"):
         p = source_text.find("Сейчас")
         print("CURRENT-WORKOUT-LABEL-SOURCE:", source_file)
         print(source_text[max(0, p - 1800):min(len(source_text), p + 1800)])
+
+
+# Exact current-workout tabs layout: keep three history/program tabs in one row,
+# then render the active-session tab below at full width.
+workout_screen = base / "ui/screens/WorkoutScreen.kt"
+wt = workout_screen.read_text()
+tabs_old = '''        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(selected = tab == "programs", onClick = { tab = "programs" }, label = { Text("Программы") })
+            FilterChip(selected = tab == "history", onClick = { tab = "history" }, label = { Text("История") })
+            FilterChip(selected = tab == "records", onClick = { tab = "records" }, label = { Text("Рекорды") })
+            if (active != null) FilterChip(selected = tab == "active", onClick = { tab = "active" }, label = { Text("Сейчас") })
+        }'''
+tabs_new = '''        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(selected = tab == "programs", onClick = { tab = "programs" }, label = { Text("Программы") })
+            FilterChip(selected = tab == "history", onClick = { tab = "history" }, label = { Text("История") })
+            FilterChip(selected = tab == "records", onClick = { tab = "records" }, label = { Text("Рекорды") })
+        }
+        if (active != null) {
+            FilterChip(
+                selected = tab == "active",
+                onClick = { tab = "active" },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("Сейчас", modifier = Modifier.fillMaxWidth(), textAlign = androidx.compose.ui.text.style.TextAlign.Center) }
+            )
+        }'''
+if tabs_old not in wt:
+    raise SystemExit('Exact workout tabs block not found; refusing to compile without requested "Сейчас" layout.')
+wt = wt.replace(tabs_old, tabs_new, 1)
+workout_screen.write_text(wt)
+print('WORKOUT UI FIXED: "Сейчас" moved below tabs and expanded to full width.')
