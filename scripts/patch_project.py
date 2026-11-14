@@ -1143,7 +1143,7 @@ dao_text = dao_text.replace(
 if "softDeleteValuesForDefinition" not in dao_text:
     dao_text = dao_text.replace(
         "    @Query(\"UPDATE measurement_values SET deletedAt = :deletedAt, updatedAt = :deletedAt WHERE id = :id\")",
-        "    @Query(\"UPDATE measurement_values SET deletedAt = :deletedAt, updatedAt = :deletedAt WHERE definitionId = :definitionId AND deletedAt IS NULL\")\\n    suspend fun softDeleteValuesForDefinition(definitionId: String, deletedAt: Long = System.currentTimeMillis())\\n\\n    @Query(\"UPDATE measurement_values SET deletedAt = :deletedAt, updatedAt = :deletedAt WHERE id = :id\")"
+        "    @Query(\"UPDATE measurement_values SET deletedAt = :deletedAt, updatedAt = :deletedAt WHERE definitionId = :definitionId AND deletedAt IS NULL\")\n    suspend fun softDeleteValuesForDefinition(definitionId: String, deletedAt: Long = System.currentTimeMillis())\n\n    @Query(\"UPDATE measurement_values SET deletedAt = :deletedAt, updatedAt = :deletedAt WHERE id = :id\")"
     )
 measurement_dao.write_text(dao_text)
 
@@ -1152,7 +1152,7 @@ screen_text = screens_file.read_text()
 if "Icons.Default.Delete" not in screen_text:
     screen_text = screen_text.replace(
         "import androidx.compose.material.icons.filled.Add",
-        "import androidx.compose.material.icons.filled.Add\\nimport androidx.compose.material.icons.filled.Delete",
+        "import androidx.compose.material.icons.filled.Add\nimport androidx.compose.material.icons.filled.Delete",
         1
     )
 old_card = """    Card(
@@ -1219,16 +1219,18 @@ wd = workout_dao.read_text()
 if "softDeleteProgram" not in wd:
     wd = wd.replace(
         '    @Query("UPDATE program_exercises SET deletedAt = :now, updatedAt = :now WHERE id = :id") suspend fun deleteExercise(id: String, now: Long = System.currentTimeMillis())',
-        '    @Query("UPDATE program_exercises SET deletedAt = :now, updatedAt = :now WHERE id = :id") suspend fun deleteExercise(id: String, now: Long = System.currentTimeMillis())\\n    @Query("UPDATE workout_programs SET deletedAt = :now, updatedAt = :now WHERE id = :id") suspend fun softDeleteProgram(id: String, now: Long = System.currentTimeMillis())\\n    @Query("UPDATE program_exercises SET deletedAt = :now, updatedAt = :now WHERE programId = :programId AND deletedAt IS NULL") suspend fun softDeleteProgramExercises(programId: String, now: Long = System.currentTimeMillis())'
+        '    @Query("UPDATE program_exercises SET deletedAt = :now, updatedAt = :now WHERE id = :id") suspend fun deleteExercise(id: String, now: Long = System.currentTimeMillis())\n    @Query("UPDATE workout_programs SET deletedAt = :now, updatedAt = :now WHERE id = :id") suspend fun softDeleteProgram(id: String, now: Long = System.currentTimeMillis())\n    @Query("UPDATE program_exercises SET deletedAt = :now, updatedAt = :now WHERE programId = :programId AND deletedAt IS NULL") suspend fun softDeleteProgramExercises(programId: String, now: Long = System.currentTimeMillis())'
     )
 workout_dao.write_text(wd)
 
 workout_screen = next(base.rglob("WorkoutScreen.kt"))
 wt = workout_screen.read_text()
+if "import androidx.compose.material.icons.filled.Delete" not in wt:
+    wt = wt.replace("import androidx.compose.material.icons.filled.Add", "import androidx.compose.material.icons.filled.Add\\nimport androidx.compose.material.icons.filled.Delete", 1)
 if "var detailProgram" not in wt:
     wt = wt.replace(
         '    var selected by remember { mutableStateOf<WorkoutProgramEntity?>(null) }',
-        '    var selected by remember { mutableStateOf<WorkoutProgramEntity?>(null) }\\n    var detailProgram by remember { mutableStateOf<WorkoutProgramEntity?>(null) }\\n    var confirmDeleteProgram by remember { mutableStateOf<WorkoutProgramEntity?>(null) }',
+        '    var selected by remember { mutableStateOf<WorkoutProgramEntity?>(null) }\n    var detailProgram by remember { mutableStateOf<WorkoutProgramEntity?>(null) }\n    var confirmDeleteProgram by remember { mutableStateOf<WorkoutProgramEntity?>(null) }',
         1
     )
 # Make program title open a dedicated exercise list.
@@ -1240,14 +1242,14 @@ wt = wt.replace(
 # Add a delete action on each program card.
 wt = wt.replace(
     'OutlinedButton(onClick = { selected = program; showExercise = true }, modifier = Modifier.weight(1f)) { Text("Добавить упражнение") }',
-    'OutlinedButton(onClick = { selected = program; showExercise = true }, modifier = Modifier.weight(1f)) { Text("Добавить упражнение") }\\n                                TextButton(onClick = { confirmDeleteProgram = program }) { Text("Удалить", color = MaterialTheme.colorScheme.error) }',
+    'OutlinedButton(onClick = { selected = program; showExercise = true }, modifier = Modifier.weight(1f)) { Text("Добавить упражнение") }\n                                TextButton(onClick = { confirmDeleteProgram = program }) { Text("Удалить", color = MaterialTheme.colorScheme.error) }',
     1
 )
 # Dedicated program detail dialog with independent exercise deletion.
 if "ProgramDetailsDialog(" not in wt:
     wt = wt.replace(
         '    if (showProgram) TextEntryDialog("Новая программа"',
-        '    detailProgram?.let { program -> ProgramDetailsDialog(program, dao, onDismiss = { detailProgram = null }, onDeleteProgram = { confirmDeleteProgram = program; detailProgram = null }) }\\n    confirmDeleteProgram?.let { program -> AlertDialog(onDismissRequest = { confirmDeleteProgram = null }, title = { Text("Удалить программу?") }, text = { Text("Программа «${program.name}» и все её упражнения будут удалены из списка. История уже проведённых тренировок сохранится.") }, confirmButton = { TextButton(onClick = { scope.launch { dao.softDeleteProgramExercises(program.id); dao.softDeleteProgram(program.id) }; confirmDeleteProgram = null }) { Text("Удалить", color = MaterialTheme.colorScheme.error) } }, dismissButton = { TextButton(onClick = { confirmDeleteProgram = null }) { Text("Отмена") } }) }\\n    if ( (showProgram) ) TextEntryDialog("Новая программа"',
+        '    detailProgram?.let { program -> ProgramDetailsDialog(program, dao, onDismiss = { detailProgram = null }, onDeleteProgram = { confirmDeleteProgram = program; detailProgram = null }) }\n    confirmDeleteProgram?.let { program -> AlertDialog(onDismissRequest = { confirmDeleteProgram = null }, title = { Text("Удалить программу?") }, text = { Text("Программа «${program.name}» и все её упражнения будут удалены из списка. История уже проведённых тренировок сохранится.") }, confirmButton = { TextButton(onClick = { scope.launch { dao.softDeleteProgramExercises(program.id); dao.softDeleteProgram(program.id) }; confirmDeleteProgram = null }) { Text("Удалить", color = MaterialTheme.colorScheme.error) } }, dismissButton = { TextButton(onClick = { confirmDeleteProgram = null }) { Text("Отмена") } }) }\n    if ( (showProgram) ) TextEntryDialog("Новая программа"',
         1
     )
     # Insert details composable before startWorkout helper.
@@ -1320,7 +1322,7 @@ media_file = next(p for p in base.rglob("*.kt") if "fun ProfileMediaPanel()" in 
 mt = media_file.read_text()
 mt = mt.replace(
     '    var selectedPhoto by remember { mutableStateOf<File?>(null) }',
-    '    var selectedPhoto by remember { mutableStateOf<File?>(null) }\\n    var confirmDeleteProfile by remember { mutableStateOf(false) }\\n    var confirmDeleteGallery by remember { mutableStateOf<File?>(null) }',
+    '    var selectedPhoto by remember { mutableStateOf<File?>(null) }\n    var confirmDeleteProfile by remember { mutableStateOf(false) }\n    var confirmDeleteGallery by remember { mutableStateOf<File?>(null) }',
     1
 )
 mt = mt.replace(
@@ -1330,7 +1332,7 @@ mt = mt.replace(
 )
 mt = mt.replace(
     'rowFiles.forEach { file -> PhotoThumb(file, Modifier.weight(1f).height(116.dp), onClick = { onPhotoClick(file) }) }',
-    'rowFiles.forEach { file -> Box(Modifier.weight(1f)) { PhotoThumb(file, Modifier.fillMaxWidth().height(116.dp), onClick = { onPhotoClick(file) }); IconButton(onClick = { confirmDeleteGallery = file }, modifier = Modifier.align(Alignment.TopEnd)) { Icon(Icons.Default.Delete, "Удалить фото", tint = MaterialTheme.colorScheme.error) } } }',
+    'rowFiles.forEach { file -> Box(Modifier.weight(1f)) { PhotoThumb(file, Modifier.fillMaxWidth().height(116.dp), onClick = { onPhotoClick(file) }); IconButton(onClick = { onDeletePhoto(file) }, modifier = Modifier.align(Alignment.TopEnd)) { Icon(Icons.Default.Delete, "Удалить фото", tint = MaterialTheme.colorScheme.error) } } }',
     1
 )
 mt = mt.replace(
