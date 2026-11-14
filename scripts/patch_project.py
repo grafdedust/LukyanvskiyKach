@@ -1967,3 +1967,23 @@ assert 'Заметка (необязательно)' not in screens_text
 assert 'FilterChip(selected = side ==' not in screens_text
 assert 'val labels = listOf("Шея", "Плечи", "Грудь", "Бицепс", "Талия", "Бёдра", "Икра", "Вес")' in screens_text
 print("MEASUREMENTS CLEANUP: removed single-thigh measure from profile/dashboard, removed left/right selectors and measurement notes.")
+
+
+# Custom measurement creation also has no separate left/right option.
+screens_text = screens_file.read_text()
+screens_text = screens_text.replace(
+    '    var sideMode by remember { mutableStateOf(false) }\n',
+    ''
+)
+screens_text = screens_text.replace(
+    '''                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(checked = sideMode, onCheckedChange = { sideMode = it })
+                    Text("Отдельно левая и правая сторона")
+                }
+''',
+    ''
+)
+screens_file.write_text(screens_text)
+assert 'Отдельно левая и правая сторона' not in screens_text
+assert 'sideMode by remember' not in screens_text
+print("MEASUREMENT CREATION: custom parameters now use one combined measurement value only.")
