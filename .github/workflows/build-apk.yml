@@ -12,22 +12,28 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
-    env:
-      ANDROID_HOME: /usr/local/lib/android/sdk
-      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Extract project
+        shell: bash
         run: |
-          ARCHIVE=$(find . -maxdepth 1 -type f -iname '*.zip' -print -quit)
-          test -n "$ARCHIVE"
+          set -euo pipefail
+          ARCHIVE="$(find . -maxdepth 1 -type f -iname '*.zip' -print -quit)"
+          if [ -z "$ARCHIVE" ]; then
+            echo "Project ZIP archive not found"
+            ls -la
+            exit 1
+          fi
           mkdir extracted
           unzip -q "$ARCHIVE" -d extracted
-          PROJECT_DIR=$(dirname "$(find extracted -name settings.gradle.kts -print -quit)")
-          test -n "$PROJECT_DIR"
+          SETTINGS_FILE="$(find extracted -name settings.gradle.kts -print -quit)"
+          if [ -z "$SETTINGS_FILE" ]; then
+            echo "settings.gradle.kts not found"
+            exit 1
+          fi
+          PROJECT_DIR="$(dirname "$SETTINGS_FILE")"
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
           echo "APK_PATH=$PROJECT_DIR/app/build/outputs/apk/debug/app-debug.apk" >> "$GITHUB_ENV"
 
@@ -37,7 +43,10 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Install Android SDK packages
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install SDK packages
         run: |
           yes | sdkmanager --licenses
           sdkmanager "platforms;android-35" "build-tools;35.0.0"
