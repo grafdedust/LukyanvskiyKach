@@ -12,31 +12,22 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Find and extract project
+      - name: Extract project
         run: |
           ARCHIVE=$(find . -maxdepth 1 -type f -iname '*.zip' -print -quit)
-          if [ -z "$ARCHIVE" ]; then
-            echo "ZIP archive not found"
-            ls -la
-            exit 1
-          fi
-
-          echo "Found archive: $ARCHIVE"
+          test -n "$ARCHIVE"
           mkdir extracted
           unzip -q "$ARCHIVE" -d extracted
-
           PROJECT_DIR=$(dirname "$(find extracted -name settings.gradle.kts -print -quit)")
-          if [ -z "$PROJECT_DIR" ]; then
-            echo "settings.gradle.kts not found"
-            find extracted -maxdepth 4 -type f
-            exit 1
-          fi
-
-          echo "Project: $PROJECT_DIR"
+          test -n "$PROJECT_DIR"
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
           echo "APK_PATH=$PROJECT_DIR/app/build/outputs/apk/debug/app-debug.apk" >> "$GITHUB_ENV"
 
@@ -46,11 +37,10 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install SDK packages
-        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - name: Install Android SDK packages
+        run: |
+          yes | sdkmanager --licenses
+          sdkmanager "platforms;android-35" "build-tools;35.0.0"
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -69,3 +59,4 @@ jobs:
           path: ${{ env.APK_PATH }}
           if-no-files-found: error
           retention-days: 14
+          
