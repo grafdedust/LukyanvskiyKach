@@ -2005,3 +2005,6 @@ screens_file.write_text(screens_text)
 assert 'Отдельно левая и правая сторона' not in screens_text
 assert 'sideMode by remember' not in screens_text
 print("CUSTOM MEASUREMENTS: one combined value; no side toggle.")
+
+# Remove the stale interpolation token left after deleting the side-label declaration.
+screens_text = screens_text.replace('$sideLabel', '')
