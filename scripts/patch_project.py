@@ -1962,7 +1962,8 @@ screens_text = screens_text.replace(
 )
 
 screens_file.write_text(screens_text)
-assert 'Бедро' not in screens_text
+assert '"Бедро" to "см"' not in screens_text
+assert 'val labels = listOf("Шея", "Плечи", "Грудь", "Бицепс", "Талия", "Бёдра", "Икра", "Вес")' in screens_text
 assert 'Заметка (необязательно)' not in screens_text
 assert 'FilterChip(selected = side ==' not in screens_text
 assert 'val labels = listOf("Шея", "Плечи", "Грудь", "Бицепс", "Талия", "Бёдра", "Икра", "Вес")' in screens_text
@@ -1987,3 +1988,20 @@ screens_file.write_text(screens_text)
 assert 'Отдельно левая и правая сторона' not in screens_text
 assert 'sideMode by remember' not in screens_text
 print("MEASUREMENT CREATION: custom parameters now use one combined measurement value only.")
+
+
+# Remove the custom-parameter left/right checkbox (single combined value only).
+screens_text = screens_file.read_text()
+screens_text = screens_text.replace('    var sideMode by remember { mutableStateOf(false) }\n', '')
+screens_text = screens_text.replace(
+    '''                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(checked = sideMode, onCheckedChange = { sideMode = it })
+                    Text("Отдельно левая и правая сторона")
+                }
+''',
+    ''
+)
+screens_file.write_text(screens_text)
+assert 'Отдельно левая и правая сторона' not in screens_text
+assert 'sideMode by remember' not in screens_text
+print("CUSTOM MEASUREMENTS: one combined value; no side toggle.")
