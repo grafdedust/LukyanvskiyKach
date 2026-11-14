@@ -518,6 +518,10 @@ app_text = app_text.replace(
 app.write_text(app_text)
 
 screens_text = screens.read_text()
+profile_debug = screens_text.find('fun ProfileScreen')
+if profile_debug >= 0:
+    print('PROFILE SCREEN SOURCE INSPECTION:')
+    print(screens_text[profile_debug:profile_debug+18000])
 screens_text = screens_text.replace(
     'fun DashboardScreen(onStartWorkout: () -> Unit, onProfile: () -> Unit) {',
     'fun DashboardScreen(database: KachDatabase, onStartWorkout: () -> Unit, onProfile: () -> Unit) {'
