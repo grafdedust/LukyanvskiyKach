@@ -1858,3 +1858,112 @@ assert 'takePersistableUriPermission' in screens_text
 assert 'LukyanovskyKach_backup_' in screens_text
 assert 'Найти последнюю копию и импортировать' in screens_text
 print("GOOGLE DRIVE BACKUP: persistent folder connection, unique archive export, automatic newest-archive search and restore picker fallback installed.")
+
+
+# Requested measurement cleanup: keep only combined hips, remove left/right
+# selection and notes from measurement entry/history, including dashboard map.
+screens_file = base / "ui/screens/Screens.kt"
+screens_text = screens_file.read_text()
+
+# Remove the obsolete single-thigh parameter from default setup.
+screens_text = screens_text.replace(
+    '"Кисть" to "см", "Бедро" to "см", "Икра" to "см", "Голеностоп" to "см"',
+    '"Кисть" to "см", "Икра" to "см", "Голеностоп" to "см"'
+)
+screens_text = screens_text.replace(
+    'listOf("Бицепс", "Предплечье", "Запястье", "Кисть", "Бедро", "Икра")',
+    'listOf("Бицепс", "Предплечье", "Запястье", "Кисть", "Икра")'
+)
+
+# Hide and soft-delete the old built-in "Бедро" measurement and its old values.
+profile_anchor = '''    LaunchedEffect(Unit) {
+        if (dao.definitionCount() == 0) {'''
+if profile_anchor not in screens_text:
+    raise SystemExit("Profile measurement initialization anchor not found")
+profile_start = screens_text.index(profile_anchor)
+profile_end = screens_text.index("\n    PageColumn {", profile_start)
+profile_block = screens_text[profile_start:profile_end]
+if "LaunchedEffect(definitions)" not in profile_block:
+    profile_block += '''
+    LaunchedEffect(definitions) {
+        definitions.filter { it.name.equals("Бедро", ignoreCase = true) }.forEach { obsolete ->
+            dao.softDeleteValuesForDefinition(obsolete.id)
+            dao.softDeleteDefinition(obsolete.id)
+        }
+    }
+'''
+    screens_text = screens_text[:profile_start] + profile_block + screens_text[profile_end:]
+
+screens_text = screens_text.replace(
+    '            definitions.forEach { definition ->',
+    '            definitions.filterNot { it.name.equals("Бедро", ignoreCase = true) }.forEach { definition ->',
+    1
+)
+screens_text = screens_text.replace(
+    'val labels = listOf("Шея", "Плечи", "Грудь", "Бицепс", "Талия", "Бёдра", "Бедро", "Икра", "Вес")',
+    'val labels = listOf("Шея", "Плечи", "Грудь", "Бицепс", "Талия", "Бёдра", "Икра", "Вес")'
+)
+
+# Cards no longer advertise left/right values.
+screens_text = screens_text.replace(
+    'Text(if (definition.sideMode == "LEFT_RIGHT") "Левая и правая стороны · " + definition.unit else "Единица: " + definition.unit,',
+    'Text("Единица: " + definition.unit,'
+)
+
+# New custom measurement definitions are always a single combined value.
+screens_text = screens_text.replace(
+    'onSave(name, unit, if (sideMode) "LEFT_RIGHT" else "NONE")',
+    'onSave(name, unit, "NONE")'
+)
+
+# Remove side selector and note input from the new-measurement dialog.
+screens_text = screens_text.replace('    var side by remember { mutableStateOf("NONE") }\n    var note by remember { mutableStateOf("") }\n', '')
+side_ui = '''                if (definition.sideMode == "LEFT_RIGHT") {
+                    Text("Сторона", style = MaterialTheme.typography.labelMedium)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        FilterChip(selected = side == "LEFT", onClick = { side = "LEFT" }, label = { Text("Левая") })
+                        Spacer(Modifier.width(8.dp))
+                        FilterChip(selected = side == "RIGHT", onClick = { side = "RIGHT" }, label = { Text("Правая") })
+                        Spacer(Modifier.width(8.dp))
+                        FilterChip(selected = side == "NONE", onClick = { side = "NONE" }, label = { Text("Общий") })
+                    }
+                }
+                OutlinedTextField(note, { note = it }, label = { Text("Заметка (необязательно)") })
+'''
+if side_ui not in screens_text:
+    raise SystemExit("Measurement side/note fields block not found")
+screens_text = screens_text.replace(side_ui, '', 1)
+screens_text = screens_text.replace(
+    'onClick = { if (number != null && number > 0) onSave(number, side.takeIf { it != "NONE" }, note) },',
+    'onClick = { if (number != null && number > 0) onSave(number, null, "") },'
+)
+
+# Do not persist measurement notes, even if an old callback still carries a note argument.
+screens_text = screens_text.replace(
+    'note = note.ifBlank { null }',
+    'note = null'
+)
+
+# History shows only the combined value and date, never side labels or notes.
+old_history_side = '''                        val sideLabel = when (item.side) {
+                            "LEFT" -> " · левая"
+                            "RIGHT" -> " · правая"
+                            else -> ""
+                        }
+'''
+screens_text = screens_text.replace(old_history_side, '', 1)
+screens_text = screens_text.replace(
+    'Text("\${item.value} \${definition.unit}$sideLabel", fontWeight = FontWeight.SemiBold)',
+    'Text("\${item.value} \${definition.unit}", fontWeight = FontWeight.SemiBold)'
+)
+screens_text = screens_text.replace(
+    '                            if (!item.note.isNullOrBlank()) Text(item.note!!, style = MaterialTheme.typography.bodySmall)\n',
+    ''
+)
+
+screens_file.write_text(screens_text)
+assert 'Бедро' not in screens_text
+assert 'Заметка (необязательно)' not in screens_text
+assert 'FilterChip(selected = side ==' not in screens_text
+assert 'val labels = listOf("Шея", "Плечи", "Грудь", "Бицепс", "Талия", "Бёдра", "Икра", "Вес")' in screens_text
+print("MEASUREMENTS CLEANUP: removed single-thigh measure from profile/dashboard, removed left/right selectors and measurement notes.")
