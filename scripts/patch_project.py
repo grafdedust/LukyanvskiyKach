@@ -719,7 +719,7 @@ print("FIXED: measurement save captures immutable definition; dialog closes afte
 import xml.sax.saxutils as xml_escape
 import shutil
 
-asset_path = Path(__file__).resolve().parent / "assets" / "body_silhouette.path"
+asset_path = Path(__file__).resolve().parent.parent / "assets" / "body_silhouette.path"
 if not asset_path.exists():
     raise SystemExit("Supplied body silhouette path asset is missing")
 vector_path = asset_path.read_text().strip()
