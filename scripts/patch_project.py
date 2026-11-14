@@ -848,7 +848,7 @@ print("Compose image imports verified.")
 # the plan-completion metric with the current weight metric.
 screens_text = screens.read_text()
 if "import androidx.compose.foundation.rememberScrollState" not in screens_text:
-    screens_text = screens_text.replace("import androidx.compose.foundation.layout.*", "import androidx.compose.foundation.layout.*\\nimport androidx.compose.foundation.rememberScrollState\\nimport androidx.compose.foundation.verticalScroll", 1)
+    screens_text = screens_text.replace("import androidx.compose.foundation.layout.*", "import androidx.compose.foundation.layout.*\nimport androidx.compose.foundation.rememberScrollState\nimport androidx.compose.foundation.verticalScroll", 1)
 dashboard_start = screens_text.index("fun DashboardScreen(database:")
 dashboard_end = screens_text.index("\n}\n\n@Composable", dashboard_start) + 2
 dashboard = screens_text[dashboard_start:dashboard_end]
@@ -1101,7 +1101,7 @@ screens_text = screens.read_text()
 if "import androidx.compose.foundation.verticalScroll" not in screens_text:
     screens_text = screens_text.replace(
         "import androidx.compose.foundation.layout.*",
-        "import androidx.compose.foundation.layout.*\\nimport androidx.compose.foundation.verticalScroll\\nimport androidx.compose.foundation.rememberScrollState",
+        "import androidx.compose.foundation.layout.*\nimport androidx.compose.foundation.verticalScroll\nimport androidx.compose.foundation.rememberScrollState",
         1
     )
 dashboard_start = screens_text.index("fun DashboardScreen(database:")
