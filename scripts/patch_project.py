@@ -2008,3 +2008,9 @@ print("CUSTOM MEASUREMENTS: one combined value; no side toggle.")
 
 # Remove the stale interpolation token left after deleting the side-label declaration.
 screens_text = screens_text.replace('$sideLabel', '')
+
+# Persist the history-label cleanup to the generated Kotlin source.
+screens_text = screens_text.replace('$sideLabel', '')
+screens_file.write_text(screens_text)
+assert '$sideLabel' not in screens_text
+print("MEASUREMENT HISTORY: stale side-label reference removed and saved.")
