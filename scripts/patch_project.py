@@ -502,6 +502,11 @@ task_debug_index = n.find("Checkbox(checked = task.isCompleted")
 if task_debug_index >= 0:
     print("TASK ROW SOURCE INSPECTION:")
     print(n[max(0, task_debug_index-1800):task_debug_index+2800])
+for source_file in base.rglob("*.kt"):
+    source_text = source_file.read_text(errors="ignore")
+    if "data class TaskEntity" in source_text or "fun saveTask" in source_text or "observeTasks(" in source_text:
+        print("TASK DATA SOURCE:", source_file)
+        print(source_text[:14000])
 assert 'var themeMode by remember' in theme_text and 'TelegramLight' in theme_text, "Theme switching patch missing"
 assert 'setApplicationLocales' in settings_text, "Language locale switch missing"
 print("FEATURE ASSERTIONS: navigation, light/dark palettes, large note editor, checklist and locale selector present.")
