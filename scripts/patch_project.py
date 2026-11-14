@@ -887,8 +887,13 @@ workout_text = workout_screen.read_text()
 seed_anchor = '''    val dateFmt = remember { SimpleDateFormat("dd.MM.yyyy · HH:mm", Locale.getDefault()) }
 
     PageColumn {'''
+if "import androidx.compose.ui.platform.LocalContext" not in workout_text:
+    workout_text = workout_text.replace("import androidx.compose.runtime.", "import androidx.compose.ui.platform.LocalContext\\nimport androidx.compose.runtime.", 1)
 seed_block = '''    val dateFmt = remember { SimpleDateFormat("dd.MM.yyyy · HH:mm", Locale.getDefault()) }
+    val seedContext = LocalContext.current
     LaunchedEffect(Unit) {
+        val seedPrefs = seedContext.getSharedPreferences("workout_seed", 0)
+        if (!seedPrefs.getBoolean("starter_programs_seeded_v1", false)) {
             val existingProgramNames = programs.map { it.name }.toSet()
             val starters = listOf(
                 Triple(
@@ -955,6 +960,19 @@ seed_block = '''    val dateFmt = remember { SimpleDateFormat("dd.MM.yyyy · HH:
                         orderIndex = exerciseIndex,
                         notes = if (exercise.first == "Планка") "Время в секундах" else null
                     ))
+                }
+            }
+            seedPrefs.edit().putBoolean("starter_programs_seeded_v1", true).apply()
+        }
+    }
+    LaunchedEffect(programs) {
+        val starterNames = setOf("Фулбоди · старт 3 раза в неделю", "Верх тела · А", "Низ тела · Б", "Домашняя · без инвентаря")
+        programs.filter { it.name in starterNames }.groupBy { it.name }.values
+            .filter { it.size > 1 }
+            .forEach { duplicates ->
+                duplicates.drop(1).forEach { duplicate ->
+                    dao.softDeleteProgramExercises(duplicate.id)
+                    dao.softDeleteProgram(duplicate.id)
                 }
             }
     }
