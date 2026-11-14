@@ -4,10 +4,6 @@ name: Build Android APK
 on:
   workflow_dispatch:
   push:
-    branches: [ main, master ]
-    paths:
-      - 'LukyanovskyKach-Android-v0.8.zip'
-      - '.github/workflows/build-apk.yml'
 
 permissions:
   contents: read
@@ -15,36 +11,61 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Extract project
+      - name: Find and extract project
         run: |
-          unzip -q LukyanovskyKach-Android-v0.8.zip -d extracted
-          test -f extracted/LukyanovskyKach/settings.gradle.kts
+          ARCHIVE=$(find . -maxdepth 1 -type f -iname '*.zip' -print -quit)
+          if [ -z "$ARCHIVE" ]; then
+            echo "ZIP archive not found"
+            ls -la
+            exit 1
+          fi
 
-      - uses: actions/setup-java@v4
+          echo "Found archive: $ARCHIVE"
+          mkdir extracted
+          unzip -q "$ARCHIVE" -d extracted
+
+          PROJECT_DIR=$(dirname "$(find extracted -name settings.gradle.kts -print -quit)")
+          if [ -z "$PROJECT_DIR" ]; then
+            echo "settings.gradle.kts not found"
+            find extracted -maxdepth 4 -type f
+            exit 1
+          fi
+
+          echo "Project: $PROJECT_DIR"
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+          echo "APK_PATH=$PROJECT_DIR/app/build/outputs/apk/debug/app-debug.apk" >> "$GITHUB_ENV"
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      - uses: android-actions/setup-android@v3
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
 
-      - name: Install Android SDK
-        run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - name: Install SDK packages
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
 
-      - uses: gradle/actions/setup-gradle@v4
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
 
       - name: Build APK
-        working-directory: extracted/LukyanovskyKach
-        run: gradle --no-daemon assembleDebug
+        run: |
+          cd "$PROJECT_DIR"
+          gradle --no-daemon assembleDebug
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
         with:
-          name: Lukyanovsky-Kach-debug-apk
-          path: extracted/LukyanovskyKach/app/build/outputs/apk/debug/app-debug.apk
+          name: Lukyanovsky-Kach-APK
+          path: ${{ env.APK_PATH }}
           if-no-files-found: error
           retention-days: 14
-          
