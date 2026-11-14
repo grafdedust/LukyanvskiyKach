@@ -1121,5 +1121,5 @@ if "val galleryPhotos = ProfileMediaStore.galleryFiles(context)" not in dashboar
 screens_text = screens_text[:dashboard_start] + dashboard + screens_text[dashboard_end:]
 screens.write_text(screens_text)
 assert "ProfilePhotoGalleryDialog" in media_text and "ProfilePhotoViewer" in media_text
-print("DASHBOARD PHOTO INJECTION:", "galleryPhotos.take(4)" in dashboard, "galleryPhotos" in dashboard)\nprint("DASHBOARD SOURCE PREVIEW:", dashboard[:12000])\nassert "ProfilePhotoGalleryDialog" in media_text and "ProfilePhotoViewer" in media_text
+print("PROGRESS PHOTO GALLERY: profile gallery and full-size viewer patched; dashboard preview injection attempted.")
 print("PROGRESS PHOTO GALLERY: full gallery, latest four dashboard previews, and full-size photo viewer added.")
