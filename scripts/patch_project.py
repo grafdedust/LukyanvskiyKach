@@ -310,3 +310,111 @@ if name_match and match:
     gradle_text = gradle_text[:name_match.start(1)] + next_name + gradle_text[name_match.end(1):]
 gradle_file.write_text(gradle_text)
 print(f"Version bumped: versionCode {old_code} -> {old_code + 1}; package id preserved.")
+
+
+# Functional fixes requested: navigation, theme variants and notebook editor.
+app_text = app.read_text()
+old_nav = '''                        onClick = {
+                            if (item.route == "more") {
+                                nav.navigate("more") {
+                                    popUpTo("home") { inclusive = false; saveState = false }
+                                    launchSingleTop = true
+                                    restoreState = false
+                                }
+                            } else {
+                                nav.navigate(item.route) {
+                                    popUpTo("home") { saveState = true }
+                                    launchSingleTop = true
+                                    restoreState = true
+                                }
+                            }
+                        },'''
+new_nav = '''                        onClick = {
+                            if (item.route == "home") {
+                                nav.popBackStack("home", inclusive = false)
+                            } else {
+                                nav.navigate(item.route) {
+                                    popUpTo("home") { inclusive = false; saveState = false }
+                                    launchSingleTop = true
+                                    restoreState = false
+                                }
+                            }
+                        },'''
+if old_nav in app_text:
+    app_text = app_text.replace(old_nav, new_nav, 1)
+else:
+    print("Bottom navigation callback already differs; left unchanged.")
+app.write_text(app_text)
+
+# Four visual identities each have both dark and light palettes.
+theme_text = theme.read_text()
+if 'private val TelegramLight' not in theme_text:
+    theme_text = theme_text.replace(
+        'private val TacticalLight = lightColorScheme(',
+        '''private val TelegramLight = lightColorScheme(
+    primary = Color(0xFF333333), onPrimary = Color.White,
+    secondary = Color(0xFF555555), background = Color(0xFFF4F4F4),
+    onBackground = Color(0xFF151515), surface = Color.White,
+    onSurface = Color(0xFF151515), surfaceVariant = Color(0xFFE8E8E8),
+    onSurfaceVariant = Color(0xFF666666), outline = Color(0xFFBDBDBD)
+)
+private val TacticalLight = lightColorScheme('''
+    )
+theme_text = theme_text.replace('"dark" -> TelegramDark',
+                                '"dark" -> if (darkTheme) TelegramDark else TelegramLight')
+theme.write_text(theme_text)
+
+# Large note editor instead of a small AlertDialog.
+notebook = base / "ui/screens/NotebookScreen.kt"
+n = notebook.read_text()
+if 'import androidx.compose.ui.window.Dialog' not in n:
+    n = n.replace('import androidx.compose.ui.platform.LocalContext\n',
+                  'import androidx.compose.ui.platform.LocalContext\nimport androidx.compose.ui.window.Dialog\nimport androidx.compose.ui.window.DialogProperties\n')
+old_editor = '''        AlertDialog(onDismissRequest = { editNote = null }, title = { Text(if (note.title.isBlank() && note.body.isBlank()) "Новая заметка" else "Заметка") },
+            text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(title, { title = it }, label = { Text("Заголовок") }, singleLine = true)
+                OutlinedTextField(body, { body = it }, label = { Text("Текст") }, minLines = 5)
+            } },
+            confirmButton = { TextButton(onClick = { scope.launch { dao.saveNote(note.copy(title = title, body = body, updatedAt = System.currentTimeMillis())) }; editNote = null }) { Text("Сохранить") } },
+            dismissButton = { Row { if (note.createdAt != note.updatedAt || note.title.isNotBlank() || note.body.isNotBlank()) TextButton(onClick = { scope.launch { dao.deleteNote(note.id, System.currentTimeMillis()) }; editNote = null }) { Text("Удалить") }; TextButton(onClick = { editNote = null }) { Text("Отмена") } } }
+        )'''
+new_editor = '''        Dialog(
+            onDismissRequest = { editNote = null },
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(0.96f).fillMaxHeight(0.90f),
+                shape = MaterialTheme.shapes.extraLarge,
+                color = MaterialTheme.colorScheme.surface
+            ) {
+                Column(Modifier.fillMaxSize().padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(if (note.title.isBlank() && note.body.isBlank()) "Новая заметка" else "Заметка",
+                        style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                    OutlinedTextField(title, { title = it }, label = { Text("Заголовок") },
+                        modifier = Modifier.fillMaxWidth(), singleLine = true)
+                    OutlinedTextField(body, { body = it }, label = { Text("Текст заметки") },
+                        modifier = Modifier.fillMaxWidth().weight(1f), minLines = 12, maxLines = Int.MAX_VALUE)
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        if (note.title.isNotBlank() || note.body.isNotBlank()) {
+                            TextButton(onClick = {
+                                scope.launch { dao.deleteNote(note.id, System.currentTimeMillis()) }
+                                editNote = null
+                            }) { Text("Удалить") }
+                        }
+                        TextButton(onClick = { editNote = null }) { Text("Отмена") }
+                        Button(onClick = {
+                            scope.launch { dao.saveNote(note.copy(title = title, body = body, updatedAt = System.currentTimeMillis())) }
+                            editNote = null
+                        }) { Text("Сохранить") }
+                    }
+                }
+            }
+        }'''
+if old_editor in n:
+    n = n.replace(old_editor, new_editor, 1)
+else:
+    print("Note editor block not matched; inspect required.")
+n = n.replace('Text("Создать список")', 'Text("Добавить задачу")')
+n = n.replace('Text("Новая задача")', 'Text("Добавить пункт задачи")')
+notebook.write_text(n)
