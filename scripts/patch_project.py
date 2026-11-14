@@ -969,12 +969,27 @@ assert 'Домашняя · без инвентаря' in workout_text
 print("WORKOUT STARTER PROGRAMS: seeded 3 editable programs with exercises on first launch.")
 
 # Progress photo gallery: open the full gallery, preview the latest four photos
-# on the dashboard, and allow every thumbnail to open a full-size viewer.
-screens_text = screens.read_text()
-if "import androidx.compose.ui.window.Dialog" not in screens_text:
-    screens_text = screens_text.replace(
+# Locate the source file that owns the existing profile media component.
+media_file = next((p for p in base.rglob("*.kt") if "fun ProfileMediaPanel()" in p.read_text(errors="ignore")), None)
+if media_file is None:
+    raise SystemExit("ProfileMediaPanel source file not found")
+media_text = media_file.read_text()
+if "import androidx.compose.ui.window.Dialog" not in media_text:
+    media_text = media_text.replace(
         "import androidx.compose.ui.platform.LocalContext",
         "import androidx.compose.ui.window.Dialog\\nimport androidx.compose.ui.platform.LocalContext",
+        1
+    )
+if "import androidx.compose.foundation.clickable" not in media_text:
+    media_text = media_text.replace(
+        "import androidx.compose.foundation.Image",
+        "import androidx.compose.foundation.clickable\\nimport androidx.compose.foundation.Image",
+        1
+    )
+if "import androidx.compose.ui.layout.ContentScale" not in media_text:
+    media_text = media_text.replace(
+        "import androidx.compose.ui.graphics.asImageBitmap",
+        "import androidx.compose.ui.layout.ContentScale\\nimport androidx.compose.ui.graphics.asImageBitmap",
         1
     )
 
@@ -996,70 +1011,44 @@ private fun PhotoThumb(file: File, modifier: Modifier = Modifier, onClick: (() -
 private fun ProfilePhotoViewer(file: File, onDismiss: () -> Unit) {
     val bitmap = remember(file.absolutePath, file.lastModified()) { BitmapFactory.decodeFile(file.absolutePath)?.asImageBitmap() }
     Dialog(onDismissRequest = onDismiss) {
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(18.dp),
-            color = MaterialTheme.colorScheme.surface
-        ) {
+        Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surface) {
             Box(Modifier.fillMaxWidth().heightIn(max = 720.dp).clickable(onClick = onDismiss), contentAlignment = Alignment.Center) {
-                if (bitmap != null) {
-                    Image(bitmap, contentDescription = "Фото в полном размере", modifier = Modifier.fillMaxWidth(), contentScale = ContentScale.Fit)
-                } else {
-                    Text("Не удалось открыть фотографию", modifier = Modifier.padding(24.dp))
-                }
+                if (bitmap != null) Image(bitmap, contentDescription = "Фото в полном размере", modifier = Modifier.fillMaxWidth(), contentScale = ContentScale.Fit)
+                else Text("Не удалось открыть фотографию", modifier = Modifier.padding(24.dp))
             }
         }
     }
 }
 
 @Composable
-private fun ProfilePhotoGalleryDialog(
-    files: List<File>,
-    onDismiss: () -> Unit,
-    onPhotoClick: (File) -> Unit
-) {
+private fun ProfilePhotoGalleryDialog(files: List<File>, onDismiss: () -> Unit, onPhotoClick: (File) -> Unit) {
     Dialog(onDismissRequest = onDismiss) {
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
-            color = MaterialTheme.colorScheme.surface
-        ) {
-            Column(
-                Modifier.fillMaxWidth().heightIn(max = 680.dp).verticalScroll(rememberScrollState()).padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
+        Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surface) {
+            Column(Modifier.fillMaxWidth().heightIn(max = 680.dp).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("Галерея прогресса · ${files.size}", modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     TextButton(onClick = onDismiss) { Text("Закрыть") }
                 }
-                if (files.isEmpty()) {
-                    Text("Фотографий пока нет")
-                } else {
-                    files.chunked(3).forEach { rowFiles ->
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            rowFiles.forEach { file ->
-                                PhotoThumb(file, Modifier.weight(1f).height(116.dp), onClick = { onPhotoClick(file) })
-                            }
-                            repeat(3 - rowFiles.size) { Spacer(Modifier.weight(1f)) }
-                        }
+                if (files.isEmpty()) Text("Фотографий пока нет")
+                else files.chunked(3).forEach { rowFiles ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        rowFiles.forEach { file -> PhotoThumb(file, Modifier.weight(1f).height(116.dp), onClick = { onPhotoClick(file) }) }
+                        repeat(3 - rowFiles.size) { Spacer(Modifier.weight(1f)) }
                     }
                 }
             }
         }
     }
 }"""
-if old_thumb not in screens_text:
+if old_thumb not in media_text:
     raise SystemExit("PhotoThumb source block not found")
-screens_text = screens_text.replace(old_thumb, new_thumb, 1)
+media_text = media_text.replace(old_thumb, new_thumb, 1)
 
-panel_start = screens_text.find("@Composable\\nfun ProfileMediaPanel()")
-if panel_start < 0:
-    panel_start = screens_text.find("@Composable\\nprivate fun ProfileMediaPanel()")
-if panel_start < 0:
-    raise SystemExit("ProfileMediaPanel function not found")
-panel_end = screens_text.find("\\n@Composable", panel_start + 20)
-if panel_end < 0:
-    raise SystemExit("ProfileMediaPanel end not found")
+panel_start = media_text.find("@Composable\\nfun ProfileMediaPanel()")
+if panel_start < 0: panel_start = media_text.find("@Composable\\nprivate fun ProfileMediaPanel()")
+if panel_start < 0: raise SystemExit("ProfileMediaPanel function not found in " + str(media_file))
+panel_end = media_text.find("\\n@Composable", panel_start + 20)
+if panel_end < 0: raise SystemExit("ProfileMediaPanel end not found")
 new_panel = """@Composable
 fun ProfileMediaPanel() {
     val context = LocalContext.current
@@ -1093,47 +1082,36 @@ fun ProfileMediaPanel() {
                 TextButton(onClick = { showGallery = true }) { Text("Открыть") }
                 FilledTonalButton(onClick = { galleryPicker.launch("image/*") }) { Icon(Icons.Default.Add, null); Spacer(Modifier.width(5.dp)); Text("Добавить") }
             }
-            if (gallery.isEmpty()) {
-                Text("Добавляйте фотографии в динамике, чтобы сравнивать изменения.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
-            } else {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    gallery.take(4).forEach { file ->
-                        PhotoThumb(file, Modifier.weight(1f).height(112.dp), onClick = { selectedPhoto = file })
-                    }
-                }
+            if (gallery.isEmpty()) Text("Добавляйте фотографии в динамике, чтобы сравнивать изменения.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+            else Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                gallery.take(4).forEach { file -> PhotoThumb(file, Modifier.weight(1f).height(112.dp), onClick = { selectedPhoto = file }) }
             }
         }
     }
-    if (showGallery) {
-        ProfilePhotoGalleryDialog(gallery, onDismiss = { showGallery = false }) { selectedPhoto = it }
-    }
+    if (showGallery) ProfilePhotoGalleryDialog(gallery, onDismiss = { showGallery = false }) { selectedPhoto = it }
     selectedPhoto?.let { file -> ProfilePhotoViewer(file) { selectedPhoto = null } }
 }"""
-screens_text = screens_text.substring(0, panel_start) + new_panel + screens_text.substring(panel_end)
+media_text = media_text[:panel_start] + new_panel + media_text[panel_end:]
+media_file.write_text(media_text)
 
-dashboard_start = screens_text.indexOf("fun DashboardScreen(database:")
-dashboard_end = screens_text.indexOf("\\n}\\n\\n@Composable", dashboard_start) + 2
-if dashboard_start < 0 or dashboard_end < 2:
-    raise SystemExit("DashboardScreen block not found for photo preview")
+# Dashboard shows the four most recently added photos; tapping opens the same full-size viewer.
+screens_text = screens.read_text()
+dashboard_start = screens_text.index("fun DashboardScreen(database:")
+dashboard_end = screens_text.index("\\n}\\n\\n@Composable", dashboard_start) + 2
+if dashboard_start < 0 or dashboard_end < 2: raise SystemExit("DashboardScreen block not found")
 dashboard = screens_text[dashboard_start:dashboard_end]
-if 'val galleryPhotos = ProfileMediaStore.galleryFiles(context)' not in dashboard:
+if "val galleryPhotos = ProfileMediaStore.galleryFiles(context)" not in dashboard:
     dashboard = dashboard.replace(
-        '    val latestWeight = weightValues.firstOrNull()',
-        '    val latestWeight = weightValues.firstOrNull()\\n    val context = LocalContext.current\\n    val galleryPhotos = ProfileMediaStore.galleryFiles(context).sortedByDescending { it.lastModified() }\\n    var selectedDashboardPhoto by remember { mutableStateOf<File?>(null) }',
+        "    val latestWeight = weightValues.firstOrNull()",
+        "    val latestWeight = weightValues.firstOrNull()\\n    val context = LocalContext.current\\n    val galleryPhotos = ProfileMediaStore.galleryFiles(context).sortedByDescending { it.lastModified() }\\n    var selectedDashboardPhoto by remember { mutableStateOf<File?>(null) }",
         1
     )
     dashboard = dashboard.replace(
-        '        BodyMeasurementMap(definitions = definitions, database = database)',
-        '        BodyMeasurementMap(definitions = definitions, database = database)\\n        if (galleryPhotos.isNotEmpty()) {\\n            SectionLabel("Последние фото")\\n            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {\\n                galleryPhotos.take(4).forEach { file -> PhotoThumb(file, Modifier.weight(1f).height(104.dp), onClick = { selectedDashboardPhoto = file }) }\\n            }\\n        }\\n        selectedDashboardPhoto?.let { file -> ProfilePhotoViewer(file) { selectedDashboardPhoto = null } }',
+        "        BodyMeasurementMap(definitions = definitions, database = database)",
+        "        BodyMeasurementMap(definitions = definitions, database = database)\\n        if (galleryPhotos.isNotEmpty()) {\\n            SectionLabel(\\"Последние фото\\")\\n            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {\\n                galleryPhotos.take(4).forEach { file -> PhotoThumb(file, Modifier.weight(1f).height(104.dp), onClick = { selectedDashboardPhoto = file }) }\\n            }\\n        }\\n        selectedDashboardPhoto?.let { file -> ProfilePhotoViewer(file) { selectedDashboardPhoto = null } }",
         1
     )
-screens_text = screens_text.substring(0, dashboard_start) + dashboard + screens_text.substring(dashboard_end)
 screens.write_text(screens_text)
-
-assert "ProfilePhotoGalleryDialog" in screens_text
-assert "ProfilePhotoViewer" in screens_text
-assert 'SectionLabel("Последние фото")' in screens_text
-assert 'galleryPhotos.take(4)' in screens_text
+assert "ProfilePhotoGalleryDialog" in media_text and "ProfilePhotoViewer" in media_text
+assert "SectionLabel(\\"Последние фото\\")" in screens_text and "galleryPhotos.take(4)" in screens_text
 print("PROGRESS PHOTO GALLERY: full gallery, latest four dashboard previews, and full-size photo viewer added.")
-
-
