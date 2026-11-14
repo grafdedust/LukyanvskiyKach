@@ -1120,5 +1120,5 @@ if "val galleryPhotos = ProfileMediaStore.galleryFiles(context)" not in dashboar
     )
 screens.write_text(screens_text)
 assert "ProfilePhotoGalleryDialog" in media_text and "ProfilePhotoViewer" in media_text
-assert "SectionLabel(\\"Последние фото\\")" in screens_text and "galleryPhotos.take(4)" in screens_text
+assert 'SectionLabel("Последние фото")' in screens_text and "galleryPhotos.take(4)" in screens_text
 print("PROGRESS PHOTO GALLERY: full gallery, latest four dashboard previews, and full-size photo viewer added.")
