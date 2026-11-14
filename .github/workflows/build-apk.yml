@@ -36,6 +36,12 @@ jobs:
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
           echo "APK_PATH=$PROJECT_DIR/app/build/outputs/apk/debug/app-debug.apk" >> "$GITHUB_ENV"
 
+      - name: Patch app source
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/patch_project.py "$PROJECT_DIR"
+
       - name: Inspect Compose sources
         shell: bash
         run: |
