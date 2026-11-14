@@ -892,14 +892,25 @@ seed_block = '''    val dateFmt = remember { SimpleDateFormat("dd.MM.yyyy · HH:
                     )
                 ),
                 Triple(
-                    "Верх / низ · 4 дня",
-                    "Чередуй тренировку верха и низа тела. Между одинаковыми тренировками оставляй время на восстановление.",
+                    "Верх тела · А",
+                    "Верх тела. Чередуй с программой «Низ тела · Б» четыре раза в неделю, оставляя дни восстановления.",
+                    listOf(
+                        Triple("Отжимания от пола или опоры", 3, 8),
+                        Triple("Тяга рюкзака в наклоне", 3, 12),
+                        Triple("Жим бутылок над головой", 3, 10),
+                        Triple("Сгибание рук с рюкзаком", 3, 12),
+                        Triple("Планка", 3, 30)
+                    )
+                ),
+                Triple(
+                    "Низ тела · Б",
+                    "Ноги и ягодицы. Чередуй с программой «Верх тела · А», не тренируй одну группу два дня подряд.",
                     listOf(
                         Triple("Приседания", 3, 10),
                         Triple("Румынская тяга с рюкзаком", 3, 10),
                         Triple("Выпады назад", 3, 10),
-                        Triple("Подъёмы на носки", 3, 15),
-                        Triple("Планка", 3, 30)
+                        Triple("Ягодичный мост", 3, 15),
+                        Triple("Подъёмы на носки", 3, 15)
                     )
                 ),
                 Triple(
@@ -944,7 +955,7 @@ if seed_anchor not in workout_text:
 workout_text = workout_text.replace(seed_anchor, seed_block, 1)
 workout_screen.write_text(workout_text)
 assert 'Фулбоди · старт 3 раза в неделю' in workout_text
-assert 'Верх / низ · 4 дня' in workout_text
+assert 'Верх тела · А' in workout_text and 'Низ тела · Б' in workout_text
 assert 'Домашняя · без инвентаря' in workout_text
 print("WORKOUT STARTER PROGRAMS: seeded 3 editable programs with exercises on first launch.")
 
