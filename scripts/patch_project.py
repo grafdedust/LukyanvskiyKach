@@ -1108,7 +1108,14 @@ if "val galleryPhotos = ProfileMediaStore.galleryFiles(context)" not in dashboar
     )
     dashboard = dashboard.replace(
         "        BodyMeasurementMap(definitions = definitions, database = database)",
-        "        BodyMeasurementMap(definitions = definitions, database = database)\\n        if (galleryPhotos.isNotEmpty()) {\\n            SectionLabel(\\"Последние фото\\")\\n            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {\\n                galleryPhotos.take(4).forEach { file -> PhotoThumb(file, Modifier.weight(1f).height(104.dp), onClick = { selectedDashboardPhoto = file }) }\\n            }\\n        }\\n        selectedDashboardPhoto?.let { file -> ProfilePhotoViewer(file) { selectedDashboardPhoto = null } }",
+        '''        BodyMeasurementMap(definitions = definitions, database = database)
+        if (galleryPhotos.isNotEmpty()) {
+            SectionLabel("Последние фото")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                galleryPhotos.take(4).forEach { file -> PhotoThumb(file, Modifier.weight(1f).height(104.dp), onClick = { selectedDashboardPhoto = file }) }
+            }
+        }
+        selectedDashboardPhoto?.let { file -> ProfilePhotoViewer(file) { selectedDashboardPhoto = null } }''',
         1
     )
 screens.write_text(screens_text)
