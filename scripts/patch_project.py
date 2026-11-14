@@ -1098,6 +1098,12 @@ media_file.write_text(media_text)
 
 # Dashboard shows the four most recently added photos; tapping opens the same full-size viewer.
 screens_text = screens.read_text()
+if "import androidx.compose.foundation.verticalScroll" not in screens_text:
+    screens_text = screens_text.replace(
+        "import androidx.compose.foundation.layout.*",
+        "import androidx.compose.foundation.layout.*\\nimport androidx.compose.foundation.verticalScroll\\nimport androidx.compose.foundation.rememberScrollState",
+        1
+    )
 dashboard_start = screens_text.index("fun DashboardScreen(database:")
 dashboard_end = screens_text.index("\n}\n\n@Composable", dashboard_start) + 2
 if dashboard_start < 0 or dashboard_end < 2: raise SystemExit("DashboardScreen block not found")
