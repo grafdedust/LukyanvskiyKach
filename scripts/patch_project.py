@@ -333,7 +333,7 @@ if 'applicationId = "com.lukyanovskykach"' not in gradle_text:
 import os
 run_number = int(os.environ.get("GITHUB_RUN_NUMBER", "1"))
 target_version_code = max(old_code + 1, 1000 + run_number)
-gradle_text = re.sub(r"(versionCode\\s*(?:=\\s*)?)\\d+", lambda m: m.group(1) + str(target_version_code), gradle_text, count=1)
+gradle_text = re.sub(r"(versionCode\s*(?:=\s*)?)\d+", lambda m: m.group(1) + str(target_version_code), gradle_text, count=1)
 gradle_file.write_text(gradle_text)
 print("Stable debug signing config applied using the persistent GitHub Actions keystore.")
 print(f"Version bumped: versionCode {old_code} -> {target_version_code}; package id preserved.")
