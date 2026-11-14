@@ -210,5 +210,32 @@ theme_text = theme_text.replace(
 )
 theme.write_text(theme_text)
 
+
+# Keep only four bottom navigation destinations. Nutrition remains fully available
+# from the More section rather than occupying a permanent bottom-bar slot.
+app_text = app.read_text()
+app_text = app_text.replace('        Destination("nutrition", R.string.tab_nutrition, Icons.Default.Restaurant),\n', '')
+app_text = app_text.replace('setOf("home", "workouts", "profile", "nutrition", "more")', 'setOf("home", "workouts", "profile", "more")')
+app_text = app_text.replace(
+    '                onNotebook = { nav.navigate("notebook") },',
+    '                onNotebook = { nav.navigate("notebook") },\n                onNutrition = { nav.navigate("nutrition") },'
+)
+app.write_text(app_text)
+
+screens_text = screens.read_text()
+screens_text = screens_text.replace(
+    'fun MoreScreen(onMedications: () -> Unit, onStatistics: () -> Unit, onSettings: () -> Unit, onNotebook: () -> Unit) {',
+    'fun MoreScreen(onMedications: () -> Unit, onStatistics: () -> Unit, onSettings: () -> Unit, onNotebook: () -> Unit, onNutrition: () -> Unit) {'
+)
+nutrition_row = '        MenuRow("Питание", onNutrition) { Icon(Icons.Default.Restaurant, null) }\n'
+if nutrition_row not in screens_text:
+    anchor = '        MenuRow("Блокнот и задачи", onNotebook) { Icon(Icons.Default.Description, null) }\n'
+    if anchor not in screens_text:
+        raise SystemExit("More menu anchor missing for Nutrition entry")
+    screens_text = screens_text.replace(anchor, nutrition_row + anchor, 1)
+screens.write_text(screens_text)
+
+print("Bottom navigation reduced to Home, Workouts, Profile and More; Nutrition moved into More.")
+
 print("Patched navigation back actions, More menu root behavior, moved backups to Settings, and added monochrome Dark theme.")
 
