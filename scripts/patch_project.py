@@ -1118,6 +1118,7 @@ if "val galleryPhotos = ProfileMediaStore.galleryFiles(context)" not in dashboar
         selectedDashboardPhoto?.let { file -> ProfilePhotoViewer(file) { selectedDashboardPhoto = null } }''',
         1
     )
+screens_text = screens_text[:dashboard_start] + dashboard + screens_text[dashboard_end:]
 screens.write_text(screens_text)
 assert "ProfilePhotoGalleryDialog" in media_text and "ProfilePhotoViewer" in media_text
 print("DASHBOARD PHOTO INJECTION:", "galleryPhotos.take(4)" in dashboard, "galleryPhotos" in dashboard)\nprint("DASHBOARD SOURCE PREVIEW:", dashboard[:12000])\nassert "ProfilePhotoGalleryDialog" in media_text and "ProfilePhotoViewer" in media_text
