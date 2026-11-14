@@ -1244,6 +1244,8 @@ workout_dao.write_text(wd)
 
 workout_screen = next(base.rglob("WorkoutScreen.kt"))
 wt = workout_screen.read_text()
+if "import androidx.compose.foundation.background" not in wt:
+    wt = wt.replace("import androidx.compose.foundation.clickable", "import androidx.compose.foundation.clickable\\nimport androidx.compose.foundation.background", 1)
 if "import androidx.compose.ui.draw.clip" not in wt:
     wt = wt.replace("import androidx.compose.ui.Modifier", "import androidx.compose.ui.Modifier\\nimport androidx.compose.ui.draw.clip", 1)
 if "import androidx.compose.material.icons.filled.Delete" not in wt:
