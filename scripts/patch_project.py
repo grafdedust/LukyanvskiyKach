@@ -1410,3 +1410,120 @@ mt = mt.replace(
 media_file.write_text(mt)
 
 print("DELETE ACTIONS: parameters (including built-in), programs, individual exercises, profile photo and gallery photos now have confirmation dialogs.")
+
+
+# User-requested workout screen refinements and cloud backup wording.
+# This block runs after the existing project patches so it wins over earlier styling.
+workout_screen = base / "ui/screens/WorkoutScreen.kt"
+wt = workout_screen.read_text()
+
+# Program title: replace the former purple accent with a translucent neutral grey.
+wt = wt.replace(
+    '.background(MaterialTheme.colorScheme.primaryContainer).clickable { detailProgram = program }.padding(horizontal = 14.dp, vertical = 12.dp), color = MaterialTheme.colorScheme.onPrimaryContainer',
+    '.background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f)).clickable { detailProgram = program }.padding(horizontal = 14.dp, vertical = 12.dp), color = MaterialTheme.colorScheme.onSurface'
+)
+
+# Move the "Сейчас" action out of the compact tabs row and place it below at full width.
+def matching_delimiter(source, start, opening, closing):
+    depth = 0
+    in_string = False
+    escaped = False
+    i = start
+    while i < len(source):
+        ch = source[i]
+        if in_string:
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == '"':
+                in_string = False
+        else:
+            if ch == '"':
+                in_string = True
+            elif ch == opening:
+                depth += 1
+            elif ch == closing:
+                depth -= 1
+                if depth == 0:
+                    return i
+        i += 1
+    return -1
+
+label_pos = wt.find('Text("Сейчас"')
+if label_pos >= 0:
+    candidates = [(wt.rfind(token, 0, label_pos), token) for token in
+                  ("OutlinedButton(", "FilledTonalButton(", "TextButton(", "Button(")]
+    candidates = [(pos, token) for pos, token in candidates if pos >= 0]
+    if candidates:
+        button_start, button_token = max(candidates)
+        open_paren = button_start + len(button_token) - 1
+        button_end_paren = matching_delimiter(wt, open_paren, "(", ")")
+        row_start = wt.rfind("Row(", 0, button_start)
+        row_open = wt.find("{", row_start, button_start) if row_start >= 0 else -1
+        row_end = matching_delimiter(wt, row_open, "{", "}") if row_open >= 0 else -1
+        if button_end_paren >= 0 and row_open >= 0 and row_end > button_end_paren:
+            button_end = button_end_paren + 1
+            # Include a trailing comma/newline when the button is a Row child.
+            while button_end < row_end and wt[button_end] in " \t":
+                button_end += 1
+            if button_end < row_end and wt[button_end] == ",":
+                button_end += 1
+            while button_end < row_end and wt[button_end] in " \t\r\n":
+                button_end += 1
+            button_code = wt[button_start:button_end].rstrip().rstrip(",")
+            # Widen the moved action, preserving its click handler and visual style.
+            import re
+            if re.search(r'\bmodifier\s*=', button_code):
+                button_code = re.sub(r'\bmodifier\s*=\s*Modifier(?:\.[A-Za-z_][A-Za-z0-9_]*(?:\([^()]*\))?)*',
+                                     'modifier = Modifier.fillMaxWidth()', button_code, count=1)
+            else:
+                button_code = button_code.replace("onClick = {", "modifier = Modifier.fillMaxWidth(), onClick = {", 1)
+            wt = wt[:button_start] + wt[button_end:]
+            # Insert after the tabs row, before the next sibling in its parent Column.
+            row_end = matching_delimiter(wt, row_open, "{", "}")
+            if row_end >= 0:
+                wt = wt[:row_end + 1] + "\n" + button_code + wt[row_end + 1:]
+                print('WORKOUT UI: moved "Сейчас" action to a full-width row below tabs.')
+            else:
+                raise SystemExit('Could not locate closing brace for workout tabs row.')
+        else:
+            print('WORKOUT UI WARNING: could not safely relocate "Сейчас"; source layout differs.')
+    else:
+        print('WORKOUT UI WARNING: "Сейчас" label found without a button wrapper.')
+else:
+    print('WORKOUT UI WARNING: no exact Text("Сейчас") label found in WorkoutScreen.kt.')
+
+workout_screen.write_text(wt)
+
+# Android Storage Access Framework exposes Google Drive as a save/open location
+# when its provider is installed and signed in. Reuse the complete ZIP backup,
+# retaining the existing explicit confirmation before replacing local data.
+for backup_screen in base.rglob("*.kt"):
+    backup_text = backup_screen.read_text()
+    if 'Text("Создать ZIP-копию")' in backup_text and 'BackupManager.export(context, uri)' in backup_text:
+        backup_text = backup_text.replace(
+            'Text("Создать ZIP-копию")',
+            'Text("Сохранить резервную копию")'
+        )
+        backup_text = backup_text.replace(
+            'Text("Восстановить из ZIP")',
+            'Text("Импортировать из Google Drive / ZIP")'
+        )
+        backup_text = backup_text.replace(
+            'Text("В ZIP попадут замеры, программы и история тренировок, а также фото профиля и галерея прогресса.",',
+            'Text("Полная копия базы, программ, упражнений, истории, настроек и фотографий. В окне сохранения выберите Google Drive и нужную папку.",'
+        )
+        backup_text = backup_text.replace(
+            'Text("Выберите ZIP, созданный этим приложением. Текущая локальная база будет заменена данными из архива.",',
+            'Text("Выберите ZIP из Google Drive или памяти устройства. Импорт заменит текущую локальную базу после подтверждения.",'
+        )
+        backup_text = backup_text.replace(
+            'Text("Совет: после экспорта отправьте ZIP себе в облако или сохраните на отдельный носитель. Файл содержит личные данные и фотографии.",',
+            'Text("Экспорт и импорт используют системное окно Android: Google Drive появится среди мест сохранения и выбора файлов, если приложение Drive установлено и подключено. Архив содержит личные данные и фотографии.",'
+        )
+        backup_screen.write_text(backup_text)
+        print("BACKUP UI: Google Drive save/open guidance added to full ZIP backup flow.")
+        break
+else:
+    print("BACKUP UI WARNING: could not find existing ZIP backup screen.")
