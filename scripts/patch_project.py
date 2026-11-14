@@ -977,19 +977,19 @@ media_text = media_file.read_text()
 if "import androidx.compose.ui.window.Dialog" not in media_text:
     media_text = media_text.replace(
         "import androidx.compose.ui.platform.LocalContext",
-        "import androidx.compose.ui.window.Dialog\\nimport androidx.compose.ui.platform.LocalContext",
+        "import androidx.compose.ui.window.Dialog\nimport androidx.compose.ui.platform.LocalContext",
         1
     )
 if "import androidx.compose.foundation.clickable" not in media_text:
     media_text = media_text.replace(
         "import androidx.compose.foundation.Image",
-        "import androidx.compose.foundation.clickable\\nimport androidx.compose.foundation.Image",
+        "import androidx.compose.foundation.clickable\nimport androidx.compose.foundation.Image",
         1
     )
 if "import androidx.compose.ui.layout.ContentScale" not in media_text:
     media_text = media_text.replace(
         "import androidx.compose.ui.graphics.asImageBitmap",
-        "import androidx.compose.ui.layout.ContentScale\\nimport androidx.compose.ui.graphics.asImageBitmap",
+        "import androidx.compose.ui.layout.ContentScale\nimport androidx.compose.ui.graphics.asImageBitmap",
         1
     )
 
@@ -1044,10 +1044,10 @@ if old_thumb not in media_text:
     raise SystemExit("PhotoThumb source block not found")
 media_text = media_text.replace(old_thumb, new_thumb, 1)
 
-panel_start = media_text.find("@Composable\\nfun ProfileMediaPanel()")
-if panel_start < 0: panel_start = media_text.find("@Composable\\nprivate fun ProfileMediaPanel()")
+panel_start = media_text.find("@Composable\nfun ProfileMediaPanel()")
+if panel_start < 0: panel_start = media_text.find("@Composable\nprivate fun ProfileMediaPanel()")
 if panel_start < 0: raise SystemExit("ProfileMediaPanel function not found in " + str(media_file))
-panel_end = media_text.find("\\n@Composable", panel_start + 20)
+panel_end = media_text.find("\n@Composable", panel_start + 20)
 if panel_end < 0: raise SystemExit("ProfileMediaPanel end not found")
 new_panel = """@Composable
 fun ProfileMediaPanel() {
@@ -1097,13 +1097,13 @@ media_file.write_text(media_text)
 # Dashboard shows the four most recently added photos; tapping opens the same full-size viewer.
 screens_text = screens.read_text()
 dashboard_start = screens_text.index("fun DashboardScreen(database:")
-dashboard_end = screens_text.index("\\n}\\n\\n@Composable", dashboard_start) + 2
+dashboard_end = screens_text.index("\n}\n\n@Composable", dashboard_start) + 2
 if dashboard_start < 0 or dashboard_end < 2: raise SystemExit("DashboardScreen block not found")
 dashboard = screens_text[dashboard_start:dashboard_end]
 if "val galleryPhotos = ProfileMediaStore.galleryFiles(context)" not in dashboard:
     dashboard = dashboard.replace(
         "    val latestWeight = weightValues.firstOrNull()",
-        "    val latestWeight = weightValues.firstOrNull()\\n    val context = LocalContext.current\\n    val galleryPhotos = ProfileMediaStore.galleryFiles(context).sortedByDescending { it.lastModified() }\\n    var selectedDashboardPhoto by remember { mutableStateOf<File?>(null) }",
+        "    val latestWeight = weightValues.firstOrNull()\n    val context = LocalContext.current\n    val galleryPhotos = ProfileMediaStore.galleryFiles(context).sortedByDescending { it.lastModified() }\n    var selectedDashboardPhoto by remember { mutableStateOf<File?>(null) }",
         1
     )
     dashboard = dashboard.replace(
