@@ -329,9 +329,14 @@ if 'signingConfigs.getByName("stableDebug")' not in gradle_text:
     gradle_text = gradle_text.replace("    buildFeatures { compose = true }", signing_block + "    buildFeatures { compose = true }", 1)
 if 'applicationId = "com.lukyanovskykach"' not in gradle_text:
     raise SystemExit("Unexpected applicationId; refusing to change package identity")
+# Use the GitHub run number so each published APK has a strictly increasing versionCode.
+import os
+run_number = int(os.environ.get("GITHUB_RUN_NUMBER", "1"))
+target_version_code = max(old_code + 1, 1000 + run_number)
+gradle_text = re.sub(r"(versionCode\\s*(?:=\\s*)?)\\d+", lambda m: m.group(1) + str(target_version_code), gradle_text, count=1)
 gradle_file.write_text(gradle_text)
 print("Stable debug signing config applied using the persistent GitHub Actions keystore.")
-print(f"Version bumped: versionCode {old_code} -> {old_code + 1}; package id preserved.")
+print(f"Version bumped: versionCode {old_code} -> {target_version_code}; package id preserved.")
 
 
 # Functional fixes requested: navigation, theme variants and notebook editor.
