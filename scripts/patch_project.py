@@ -1593,3 +1593,268 @@ for candidate in base.rglob("*.kt"):
         print("BACKUP-SCREEN-SOURCE-BEGIN:", candidate)
         print(candidate_text[:24000])
         print("BACKUP-SCREEN-SOURCE-END")
+
+
+# Real Google Drive backup connection through Android's Storage Access Framework.
+screens_file = base / "ui/screens/Screens.kt"
+screens_text = screens_file.read_text()
+for import_line in [
+    "import android.content.Context",
+    "import android.content.Intent",
+    "import android.provider.DocumentsContract",
+    "import kotlinx.coroutines.Dispatchers",
+    "import kotlinx.coroutines.withContext",
+    "import java.text.SimpleDateFormat",
+    "import java.util.Date",
+    "import java.util.Locale"
+]:
+    if import_line not in screens_text:
+        screens_text = screens_text.replace(
+            "package com.lukyanovskykach.ui.screens\n",
+            "package com.lukyanovskykach.ui.screens\n" + import_line + "\n",
+            1
+        )
+
+start_backup = screens_text.find("@Composable\nfun BackupSettingsScreen()")
+if start_backup < 0:
+    raise SystemExit("BackupSettingsScreen entry point not found")
+next_composable = screens_text.find("\n@Composable", start_backup + 1)
+if next_composable < 0:
+    next_composable = len(screens_text)
+
+drive_backup_code = r'''
+private fun findLatestKachBackup(context: Context, treeUri: Uri): Uri? {
+    val rootDocumentId = DocumentsContract.getTreeDocumentId(treeUri)
+    val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, rootDocumentId)
+    val projection = arrayOf(
+        DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+        DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+        DocumentsContract.Document.COLUMN_MIME_TYPE
+    )
+    var latestId: String? = null
+    var latestName: String? = null
+    context.contentResolver.query(childrenUri, projection, null, null, null)?.use { cursor ->
+        val idColumn = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
+        val nameColumn = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
+        val mimeColumn = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_MIME_TYPE)
+        while (cursor.moveToNext()) {
+            val id = cursor.getString(idColumn)
+            val name = cursor.getString(nameColumn) ?: continue
+            val mime = cursor.getString(mimeColumn)
+            if (name.startsWith("LukyanovskyKach_backup_", ignoreCase = true) &&
+                name.endsWith(".zip", ignoreCase = true) &&
+                (mime == null || mime == "application/zip" || mime == "application/octet-stream")) {
+                if (latestName == null || name > latestName!!) {
+                    latestName = name
+                    latestId = id
+                }
+            }
+        }
+    }
+    return latestId?.let { DocumentsContract.buildDocumentUriUsingTree(treeUri, it) }
+}
+
+@Composable
+fun BackupSettingsScreen() {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val prefs = remember(context) { context.getSharedPreferences("kach_drive_backup", Context.MODE_PRIVATE) }
+    var driveTreeUri by remember {
+        mutableStateOf(prefs.getString("drive_tree_uri", null)?.let { Uri.parse(it) })
+    }
+    var message by remember { mutableStateOf<String?>(null) }
+    var busy by remember { mutableStateOf(false) }
+    var confirmImport by remember { mutableStateOf<Uri?>(null) }
+
+    val connectDriveLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocumentTree()
+    ) { uri ->
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                )
+                prefs.edit().putString("drive_tree_uri", uri.toString()).apply()
+                driveTreeUri = uri
+                message = "Папка Google Drive подключена. Резервные копии будут сохраняться в неё."
+            }.onFailure {
+                message = "Не удалось подключить папку: \${it.message}"
+            }
+        }
+    }
+
+    val manualImportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            }
+            confirmImport = uri
+        }
+    }
+
+    PageColumn {
+        Text("Резервная копия", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        Text(
+            "Полная резервная копия базы, тренировок, упражнений, питания, препаратов, настроек и фотографий.",
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("Google Drive", fontWeight = FontWeight.SemiBold)
+                Text(
+                    if (driveTreeUri == null) "Google Drive ещё не подключён. Выберите папку Google Drive один раз."
+                    else "Папка Google Drive подключена. Приложение будет искать в ней последнюю резервную копию.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall
+                )
+                OutlinedButton(
+                    onClick = { connectDriveLauncher.launch(driveTreeUri) },
+                    enabled = !busy,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(if (driveTreeUri == null) "Подключить Google Drive" else "Изменить папку Google Drive")
+                }
+                Button(
+                    onClick = {
+                        val tree = driveTreeUri
+                        if (tree == null) {
+                            message = "Сначала подключите папку Google Drive."
+                            connectDriveLauncher.launch(null)
+                        } else {
+                            scope.launch {
+                                busy = true
+                                message = null
+                                runCatching {
+                                    withContext(Dispatchers.IO) {
+                                        val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+                                        val suffix = UUID.randomUUID().toString().take(8)
+                                        val fileName = "LukyanovskyKach_backup_\${stamp}_\${suffix}.zip"
+                                        val rootId = DocumentsContract.getTreeDocumentId(tree)
+                                        val rootDocument = DocumentsContract.buildDocumentUriUsingTree(tree, rootId)
+                                        val archiveUri = DocumentsContract.createDocument(
+                                            context.contentResolver,
+                                            rootDocument,
+                                            "application/zip",
+                                            fileName
+                                        ) ?: error("Google Drive не создал файл архива")
+                                        BackupManager.export(context, archiveUri)
+                                        prefs.edit().putString("latest_backup_uri", archiveUri.toString()).apply()
+                                        fileName
+                                    }
+                                }.onSuccess {
+                                    message = "Резервная копия сохранена в Google Drive: \$it"
+                                }.onFailure {
+                                    message = "Ошибка резервного копирования: \${it.message}"
+                                }
+                                busy = false
+                            }
+                        }
+                    },
+                    enabled = !busy,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Сделать резервную копию на Google Drive")
+                }
+            }
+        }
+
+        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("Восстановление данных", fontWeight = FontWeight.SemiBold)
+                Text(
+                    "Импорт автоматически ищет самый новый архив LukyanovskyKach_backup_ в подключённой папке Google Drive. Если архив не найден, можно выбрать ZIP вручную.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall
+                )
+                Button(
+                    onClick = {
+                        val tree = driveTreeUri
+                        if (tree == null) {
+                            message = "Сначала подключите папку Google Drive."
+                            connectDriveLauncher.launch(null)
+                        } else {
+                            scope.launch {
+                                busy = true
+                                message = null
+                                val latest = runCatching {
+                                    withContext(Dispatchers.IO) { findLatestKachBackup(context, tree) }
+                                }.getOrElse {
+                                    message = "Не удалось просканировать Google Drive: \${it.message}"
+                                    null
+                                }
+                                busy = false
+                                if (latest != null) {
+                                    confirmImport = latest
+                                } else if (message == null) {
+                                    message = "Архив в подключённой папке не найден. Выберите ZIP вручную."
+                                    manualImportLauncher.launch(arrayOf("application/zip", "application/octet-stream"))
+                                }
+                            }
+                        }
+                    },
+                    enabled = !busy,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Найти последнюю копию и импортировать")
+                }
+                OutlinedButton(
+                    onClick = { manualImportLauncher.launch(arrayOf("application/zip", "application/octet-stream")) },
+                    enabled = !busy,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Выбрать ZIP вручную")
+                }
+            }
+        }
+
+        if (busy) CircularProgressIndicator()
+        message?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
+        Text(
+            "Подключение выполняется через системный выбор папки Android. Выберите папку на Google Drive и подтвердите доступ. Архивы получают уникальные имена и не перезаписывают предыдущие копии.",
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodySmall
+        )
+    }
+
+    confirmImport?.let { uri ->
+        AlertDialog(
+            onDismissRequest = { confirmImport = null },
+            title = { Text("Заменить текущие данные?") },
+            text = { Text("Будет импортирован найденный архив. Текущая локальная база и связанные данные будут заменены. Перед продолжением убедитесь, что у вас есть актуальная резервная копия.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmImport = null
+                    scope.launch {
+                        busy = true
+                        runCatching {
+                            withContext(Dispatchers.IO) { BackupManager.import(context, uri) }
+                        }.onSuccess {
+                            message = "Импорт завершён. Данные и фотографии восстановлены."
+                        }.onFailure {
+                            message = "Ошибка импорта: \${it.message}"
+                        }
+                        busy = false
+                    }
+                }) { Text("Заменить данные") }
+            },
+            dismissButton = { TextButton(onClick = { confirmImport = null }) { Text("Отмена") } }
+        )
+    }
+}
+'''
+screens_text = screens_text[:start_backup] + drive_backup_code + screens_text[next_composable:]
+screens_file.write_text(screens_text)
+
+assert 'fun findLatestKachBackup' in screens_text
+assert 'DocumentsContract.createDocument' in screens_text
+assert 'takePersistableUriPermission' in screens_text
+assert 'LukyanovskyKach_backup_' in screens_text
+assert 'Найти последнюю копию и импортировать' in screens_text
+print("GOOGLE DRIVE BACKUP: persistent folder connection, unique archive export, automatic newest-archive search and restore picker fallback installed.")
