@@ -842,3 +842,87 @@ if 'Text(stringResource(R.string.current_weight)' in dashboard:
 screens_text = screens_text[:dashboard_start] + dashboard + screens_text[dashboard_end:]
 screens.write_text(screens_text)
 print("DASHBOARD UPDATED: removed top weight card; replaced plan completion with current weight.")
+
+
+# Seed useful ready-to-run workout templates on the first visit.
+workout_screen = base / "ui/screens/WorkoutScreen.kt"
+if not workout_screen.exists():
+    raise SystemExit("WorkoutScreen.kt not found")
+workout_text = workout_screen.read_text()
+seed_anchor = '''    val dateFmt = remember { SimpleDateFormat("dd.MM.yyyy · HH:mm", Locale.getDefault()) }
+
+    PageColumn {'''
+seed_block = '''    val dateFmt = remember { SimpleDateFormat("dd.MM.yyyy · HH:mm", Locale.getDefault()) }
+    var starterProgramsSeeded by remember { mutableStateOf(false) }
+    LaunchedEffect(programs.isEmpty()) {
+        if (programs.isEmpty() && !starterProgramsSeeded) {
+            starterProgramsSeeded = true
+            val starters = listOf(
+                Triple(
+                    "Фулбоди · старт 3 раза в неделю",
+                    "Базовая программа на всё тело. Выполняй через день, оставляя день на восстановление.",
+                    listOf(
+                        Triple("Приседания с собственным весом", 3, 12),
+                        Triple("Отжимания от пола или опоры", 3, 8),
+                        Triple("Тяга рюкзака в наклоне", 3, 12),
+                        Triple("Ягодичный мост", 3, 15),
+                        Triple("Планка", 3, 30)
+                    )
+                ),
+                Triple(
+                    "Верх / низ · 4 дня",
+                    "Чередуй тренировку верха и низа тела. Между одинаковыми тренировками оставляй время на восстановление.",
+                    listOf(
+                        Triple("Приседания", 3, 10),
+                        Triple("Румынская тяга с рюкзаком", 3, 10),
+                        Triple("Выпады назад", 3, 10),
+                        Triple("Подъёмы на носки", 3, 15),
+                        Triple("Планка", 3, 30)
+                    )
+                ),
+                Triple(
+                    "Домашняя · без инвентаря",
+                    "Короткая программа с весом собственного тела. Подходит для старта без оборудования.",
+                    listOf(
+                        Triple("Приседания", 3, 15),
+                        Triple("Отжимания от стены или опоры", 3, 10),
+                        Triple("Обратные выпады", 3, 8),
+                        Triple("Супермен лёжа", 3, 12),
+                        Triple("Скручивания", 3, 12)
+                    )
+                )
+            )
+            starters.forEachIndexed { programIndex, starter ->
+                val programId = UUID.randomUUID().toString()
+                dao.saveProgram(WorkoutProgramEntity(
+                    id = programId,
+                    name = starter.first,
+                    notes = starter.second
+                ))
+                starter.third.forEachIndexed { exerciseIndex, exercise ->
+                    dao.saveExercise(ProgramExerciseEntity(
+                        id = UUID.randomUUID().toString(),
+                        programId = programId,
+                        name = exercise.first,
+                        sets = exercise.second,
+                        reps = exercise.third,
+                        weightKg = 0.0,
+                        restSeconds = if (exercise.first == "Планка") 45 else 90,
+                        orderIndex = exerciseIndex,
+                        notes = if (exercise.first == "Планка") "Время в секундах" else null
+                    ))
+                }
+            }
+        }
+    }
+
+    PageColumn {'''
+if seed_anchor not in workout_text:
+    raise SystemExit("WorkoutScreen seed insertion point not found")
+workout_text = workout_text.replace(seed_anchor, seed_block, 1)
+workout_screen.write_text(workout_text)
+assert 'Фулбоди · старт 3 раза в неделю' in workout_text
+assert 'Верх / низ · 4 дня' in workout_text
+assert 'Домашняя · без инвентаря' in workout_text
+print("WORKOUT STARTER PROGRAMS: seeded 3 editable programs with exercises on first launch.")
+
