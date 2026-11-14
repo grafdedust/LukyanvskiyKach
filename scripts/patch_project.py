@@ -1272,7 +1272,7 @@ wt = wt.replace(
 # Add a delete action on each program card.
 wt = wt.replace(
     'OutlinedButton(onClick = { selected = program; showExercise = true }, modifier = Modifier.weight(1f)) { Text("Добавить упражнение") }',
-    'OutlinedButton(onClick = { selected = program; showExercise = true }, modifier = Modifier.weight(1f)) { Text("Добавить упражнение") }\n                                TextButton(onClick = { confirmDeleteProgram = program }) { Text("Удалить", color = MaterialTheme.colorScheme.error) }',
+    'OutlinedButton(onClick = { selected = program; showExercise = true }, modifier = Modifier.weight(1f)) { Text("Добавить упражнение") }\n                                IconButton(onClick = { confirmDeleteProgram = program }) { Icon(Icons.Default.Delete, contentDescription = "Удалить программу", tint = MaterialTheme.colorScheme.error) }',
     1
 )
 # Dedicated program detail dialog with independent exercise deletion.
@@ -1324,6 +1324,23 @@ private fun ProgramDetailsDialog(program: WorkoutProgramEntity, dao: WorkoutDao,
 """
     if marker not in wt: raise SystemExit("Workout start helper marker missing")
     wt = wt.replace(marker,detail+marker,1)
+old_actions = '''                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedButton(onClick = { selected = program; showExercise = true }, modifier = Modifier.weight(1f)) { Text("Добавить упражнение") }
+                                IconButton(onClick = { confirmDeleteProgram = program }) { Icon(Icons.Default.Delete, contentDescription = "Удалить программу", tint = MaterialTheme.colorScheme.error) }
+                                Button(onClick = { scope.launch { startWorkout(dao, program) }; tab = "active" }, enabled = exercises.isNotEmpty(), modifier = Modifier.weight(1f)) { Text("Начать") }
+                            }'''
+new_actions = '''                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                                IconButton(onClick = { confirmDeleteProgram = program }) {
+                                    Icon(Icons.Default.Delete, contentDescription = "Удалить программу", tint = MaterialTheme.colorScheme.error)
+                                }
+                                Button(onClick = { scope.launch { startWorkout(dao, program) }; tab = "active" }, enabled = exercises.isNotEmpty(), modifier = Modifier.weight(1f)) { Text("Начать") }
+                            }
+                            OutlinedButton(onClick = { selected = program; showExercise = true }, modifier = Modifier.fillMaxWidth()) {
+                                Text("Добавить упражнение")
+                            }'''
+if old_actions not in wt:
+    raise SystemExit("Workout action row source not found; refusing layout rewrite")
+wt = wt.replace(old_actions, new_actions, 1)
 wt = wt.replace("\\n", "\n")
 print("WORKOUT_CARD_SOURCE_DEBUG\\n" + wt[max(0, wt.find('Text(program.name')-500):wt.find('Text(program.name')+2600])
 workout_screen.write_text(wt)
