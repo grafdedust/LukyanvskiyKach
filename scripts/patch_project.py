@@ -1244,6 +1244,8 @@ workout_dao.write_text(wd)
 
 workout_screen = next(base.rglob("WorkoutScreen.kt"))
 wt = workout_screen.read_text()
+if "import androidx.compose.ui.draw.clip" not in wt:
+    wt = wt.replace("import androidx.compose.ui.Modifier", "import androidx.compose.ui.Modifier\\nimport androidx.compose.ui.draw.clip", 1)
 if "import androidx.compose.material.icons.filled.Delete" not in wt:
     wt = wt.replace("import androidx.compose.material.icons.filled.Add", "import androidx.compose.material.icons.filled.Add\\nimport androidx.compose.material.icons.filled.Delete", 1)
 if "var detailProgram" not in wt:
@@ -1323,6 +1325,7 @@ private fun ProgramDetailsDialog(program: WorkoutProgramEntity, dao: WorkoutDao,
     if marker not in wt: raise SystemExit("Workout start helper marker missing")
     wt = wt.replace(marker,detail+marker,1)
 wt = wt.replace("\\n", "\n")
+print("WORKOUT_CARD_SOURCE_DEBUG\\n" + wt[max(0, wt.find('Text(program.name')-500):wt.find('Text(program.name')+2600)])
 workout_screen.write_text(wt)
 
 # Photo deletion: update the media store and expose separate confirmed actions.
