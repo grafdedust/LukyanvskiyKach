@@ -1331,14 +1331,14 @@ old_actions = '''                            Row(horizontalArrangement = Arrange
                                 IconButton(onClick = { confirmDeleteProgram = program }) { Icon(Icons.Default.Delete, contentDescription = "Удалить программу", tint = MaterialTheme.colorScheme.error) }
                                 Button(onClick = { scope.launch { startWorkout(dao, program) }; tab = "active" }, enabled = exercises.isNotEmpty(), modifier = Modifier.weight(1f)) { Text("Начать") }
                             }'''
-new_actions = '''                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+new_actions = '''                            OutlinedButton(onClick = { selected = program; showExercise = true }, modifier = Modifier.fillMaxWidth()) {
+                                Text("Добавить упражнение")
+                            }
+                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                                 IconButton(onClick = { confirmDeleteProgram = program }) {
                                     Icon(Icons.Default.Delete, contentDescription = "Удалить программу", tint = MaterialTheme.colorScheme.error)
                                 }
                                 Button(onClick = { scope.launch { startWorkout(dao, program) }; tab = "active" }, enabled = exercises.isNotEmpty(), modifier = Modifier.weight(1f)) { Text("Начать") }
-                            }
-                            OutlinedButton(onClick = { selected = program; showExercise = true }, modifier = Modifier.fillMaxWidth()) {
-                                Text("Добавить упражнение")
                             }'''
 if old_actions not in wt:
     raise SystemExit("Workout action row source not found; refusing layout rewrite")
@@ -1578,7 +1578,18 @@ assert 'Modifier.fillMaxWidth()' in final_workout[active_pos:active_pos + 700], 
 assert 'background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f))' in final_workout
 start_pos = final_workout.find('Text("Начать")')
 add_pos = final_workout.find('Text("Добавить упражнение")')
-assert start_pos >= 0 and add_pos >= 0 and start_pos < add_pos, 'Workout action order is not Start then Add exercise'
+assert start_pos >= 0 and add_pos >= 0 and add_pos < start_pos, 'Workout action order must be Add exercise then Start'
 backup_files = [p for p in base.rglob("*.kt") if 'Импортировать из Google Drive / ZIP' in p.read_text()]
 assert backup_files, 'Google Drive import entry missing from backup screen'
 print("REQUESTED CHANGES VERIFIED: full-width Сейчас, translucent grey program title, Start before Add exercise, Google Drive ZIP import/export UI.")
+
+
+# Dump the exact backup screen source into the CI log before applying the next
+# targeted Google Drive enhancement. This keeps the patch grounded in the ZIP's
+# current implementation instead of guessing at ActivityResult launcher names.
+for candidate in base.rglob("*.kt"):
+    candidate_text = candidate.read_text()
+    if 'BackupManager.export(context, uri)' in candidate_text:
+        print("BACKUP-SCREEN-SOURCE-BEGIN:", candidate)
+        print(candidate_text[:24000])
+        print("BACKUP-SCREEN-SOURCE-END")
