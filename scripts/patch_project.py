@@ -1131,3 +1131,10 @@ screens.write_text(screens_text)
 assert "ProfilePhotoGalleryDialog" in media_text and "ProfilePhotoViewer" in media_text
 print("PROGRESS PHOTO GALLERY: profile gallery and full-size viewer patched; dashboard preview injection attempted.")
 print("PROGRESS PHOTO GALLERY: full gallery, latest four dashboard previews, and full-size photo viewer added.")
+# TEMP SOURCE INSPECTION FOR DELETE FEATURE IMPLEMENTATION
+for p in base.rglob("*.kt"):
+    t = p.read_text(errors="ignore")
+    if p.name in ("WorkoutScreen.kt", "WorkoutDao.kt", "WorkoutEntities.kt", "MeasurementDao.kt", "MeasurementEntities.kt", "ProfileMediaStore.kt"):
+        print("===== DELETE FEATURE SOURCE " + str(p) + " =====")
+        print(t[:26000])
+
