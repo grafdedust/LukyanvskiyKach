@@ -1131,10 +1131,230 @@ screens.write_text(screens_text)
 assert "ProfilePhotoGalleryDialog" in media_text and "ProfilePhotoViewer" in media_text
 print("PROGRESS PHOTO GALLERY: profile gallery and full-size viewer patched; dashboard preview injection attempted.")
 print("PROGRESS PHOTO GALLERY: full gallery, latest four dashboard previews, and full-size photo viewer added.")
-# TEMP SOURCE INSPECTION FOR DELETE FEATURE IMPLEMENTATION
-for p in base.rglob("*.kt"):
-    t = p.read_text(errors="ignore")
-    if p.name in ("WorkoutScreen.kt", "WorkoutDao.kt", "WorkoutEntities.kt", "MeasurementDao.kt", "MeasurementEntities.kt", "ProfileMediaStore.kt"):
-        print("===== DELETE FEATURE SOURCE " + str(p) + " =====")
-        print(t[:26000])
 
+
+# Deletion controls for profile measurements, workout programs/exercises, and photos.
+measurement_dao = next(base.rglob("MeasurementDao.kt"))
+dao_text = measurement_dao.read_text()
+dao_text = dao_text.replace(
+    "WHERE id = :id AND isBuiltIn = 0",
+    "WHERE id = :id"
+)
+if "softDeleteValuesForDefinition" not in dao_text:
+    dao_text = dao_text.replace(
+        "    @Query(\"UPDATE measurement_values SET deletedAt = :deletedAt, updatedAt = :deletedAt WHERE id = :id\")",
+        "    @Query(\"UPDATE measurement_values SET deletedAt = :deletedAt, updatedAt = :deletedAt WHERE definitionId = :definitionId AND deletedAt IS NULL\")\\n    suspend fun softDeleteValuesForDefinition(definitionId: String, deletedAt: Long = System.currentTimeMillis())\\n\\n    @Query(\"UPDATE measurement_values SET deletedAt = :deletedAt, updatedAt = :deletedAt WHERE id = :id\")"
+    )
+measurement_dao.write_text(dao_text)
+
+screens_file = next(p for p in base.rglob("Screens.kt") if "fun MeasurementDefinitionCard(" in p.read_text(errors="ignore"))
+screen_text = screens_file.read_text()
+if "Icons.Default.Delete" not in screen_text:
+    screen_text = screen_text.replace(
+        "import androidx.compose.material.icons.filled.Add",
+        "import androidx.compose.material.icons.filled.Add\\nimport androidx.compose.material.icons.filled.Delete",
+        1
+    )
+old_card = """    Card(
+        onClick = onClick,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(definition.name, fontWeight = FontWeight.SemiBold)
+                val values by database.measurementDao().observeValues(definition.id).collectAsState(initial = emptyList())
+                val latest = values.firstOrNull()
+                Text(if (latest == null) "Пока нет замеров · " + definition.unit else "Последнее: " + latest.value + " " + definition.unit,
+                    color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+                Text(if (definition.sideMode == "LEFT_RIGHT") "Левая и правая стороны · " + definition.unit else "Единица: " + definition.unit,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+            }
+            TextButton(onClick = onHistory) { Text("История") }
+            Icon(Icons.Default.Add, null, tint = MaterialTheme.colorScheme.primary)
+        }
+    }"""
+new_card = """    var confirmDelete by remember(definition.id) { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    Card(
+        onClick = onClick,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(definition.name, fontWeight = FontWeight.SemiBold)
+                val values by database.measurementDao().observeValues(definition.id).collectAsState(initial = emptyList())
+                val latest = values.firstOrNull()
+                Text(if (latest == null) "Пока нет замеров · " + definition.unit else "Последнее: " + latest.value + " " + definition.unit,
+                    color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+                Text(if (definition.sideMode == "LEFT_RIGHT") "Левая и правая стороны · " + definition.unit else "Единица: " + definition.unit,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+            }
+            TextButton(onClick = onHistory) { Text("История") }
+            Icon(Icons.Default.Add, null, tint = MaterialTheme.colorScheme.primary)
+            IconButton(onClick = { confirmDelete = true }) { Icon(Icons.Default.Delete, "Удалить параметр", tint = MaterialTheme.colorScheme.error) }
+        }
+    }
+    if (confirmDelete) AlertDialog(
+        onDismissRequest = { confirmDelete = false },
+        title = { Text("Удалить параметр?") },
+        text = { Text("Параметр «${definition.name}» и вся его история замеров будут скрыты из профиля. Это действие нельзя отменить.") },
+        confirmButton = { TextButton(onClick = {
+            scope.launch {
+                val dao = database.measurementDao()
+                dao.softDeleteValuesForDefinition(definition.id)
+                dao.softDeleteDefinition(definition.id)
+            }
+            confirmDelete = false
+        }) { Text("Удалить", color = MaterialTheme.colorScheme.error) } },
+        dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Отмена") } }
+    )"""
+if old_card not in screen_text: raise SystemExit("MeasurementDefinitionCard source block not found")
+screen_text = screen_text.replace(old_card,new_card,1)
+screens_file.write_text(screen_text)
+
+workout_dao = next(base.rglob("WorkoutDao.kt"))
+wd = workout_dao.read_text()
+if "softDeleteProgram" not in wd:
+    wd = wd.replace(
+        '    @Query("UPDATE program_exercises SET deletedAt = :now, updatedAt = :now WHERE id = :id") suspend fun deleteExercise(id: String, now: Long = System.currentTimeMillis())',
+        '    @Query("UPDATE program_exercises SET deletedAt = :now, updatedAt = :now WHERE id = :id") suspend fun deleteExercise(id: String, now: Long = System.currentTimeMillis())\\n    @Query("UPDATE workout_programs SET deletedAt = :now, updatedAt = :now WHERE id = :id") suspend fun softDeleteProgram(id: String, now: Long = System.currentTimeMillis())\\n    @Query("UPDATE program_exercises SET deletedAt = :now, updatedAt = :now WHERE programId = :programId AND deletedAt IS NULL") suspend fun softDeleteProgramExercises(programId: String, now: Long = System.currentTimeMillis())'
+    )
+workout_dao.write_text(wd)
+
+workout_screen = next(base.rglob("WorkoutScreen.kt"))
+wt = workout_screen.read_text()
+if "var detailProgram" not in wt:
+    wt = wt.replace(
+        '    var selected by remember { mutableStateOf<WorkoutProgramEntity?>(null) }',
+        '    var selected by remember { mutableStateOf<WorkoutProgramEntity?>(null) }\\n    var detailProgram by remember { mutableStateOf<WorkoutProgramEntity?>(null) }\\n    var confirmDeleteProgram by remember { mutableStateOf<WorkoutProgramEntity?>(null) }',
+        1
+    )
+# Make program title open a dedicated exercise list.
+wt = wt.replace(
+    'Text(program.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)',
+    'Text(program.name, modifier = Modifier.fillMaxWidth().clickable { detailProgram = program }, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)',
+    1
+)
+# Add a delete action on each program card.
+wt = wt.replace(
+    'OutlinedButton(onClick = { selected = program; showExercise = true }, modifier = Modifier.weight(1f)) { Text("Добавить упражнение") }',
+    'OutlinedButton(onClick = { selected = program; showExercise = true }, modifier = Modifier.weight(1f)) { Text("Добавить упражнение") }\\n                                TextButton(onClick = { confirmDeleteProgram = program }) { Text("Удалить", color = MaterialTheme.colorScheme.error) }',
+    1
+)
+# Dedicated program detail dialog with independent exercise deletion.
+if "ProgramDetailsDialog(" not in wt:
+    wt = wt.replace(
+        '    if (showProgram) TextEntryDialog("Новая программа"',
+        '    detailProgram?.let { program -> ProgramDetailsDialog(program, dao, onDismiss = { detailProgram = null }, onDeleteProgram = { confirmDeleteProgram = program; detailProgram = null }) }\\n    confirmDeleteProgram?.let { program -> AlertDialog(onDismissRequest = { confirmDeleteProgram = null }, title = { Text("Удалить программу?") }, text = { Text("Программа «${program.name}» и все её упражнения будут удалены из списка. История уже проведённых тренировок сохранится.") }, confirmButton = { TextButton(onClick = { scope.launch { dao.softDeleteProgramExercises(program.id); dao.softDeleteProgram(program.id) }; confirmDeleteProgram = null }) { Text("Удалить", color = MaterialTheme.colorScheme.error) } }, dismissButton = { TextButton(onClick = { confirmDeleteProgram = null }) { Text("Отмена") } }) }\\n    if ( (showProgram) ) TextEntryDialog("Новая программа"',
+        1
+    )
+    # Insert details composable before startWorkout helper.
+    marker = 'private suspend fun startWorkout(dao: WorkoutDao, program: WorkoutProgramEntity) {'
+    detail = """@Composable
+private fun ProgramDetailsDialog(program: WorkoutProgramEntity, dao: WorkoutDao, onDismiss: () -> Unit, onDeleteProgram: () -> Unit) {
+    val exercises by dao.observeExercises(program.id).collectAsState(initial = emptyList())
+    val scope = rememberCoroutineScope()
+    var deletingExercise by remember { mutableStateOf<ProgramExerciseEntity?>(null) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(program.name) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                program.notes?.takeIf { it.isNotBlank() }?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                if (exercises.isEmpty()) Text("В программе пока нет упражнений")
+                exercises.forEach { exercise ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(exercise.name, fontWeight = FontWeight.SemiBold)
+                            Text("${exercise.sets} × ${exercise.reps} · ${exercise.weightKg} кг", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        IconButton(onClick = { deletingExercise = exercise }) { Icon(Icons.Default.Delete, "Удалить упражнение", tint = MaterialTheme.colorScheme.error) }
+                    }
+                }
+                TextButton(onClick = onDeleteProgram) { Text("Удалить программу", color = MaterialTheme.colorScheme.error) }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Готово") } }
+    )
+    deletingExercise?.let { exercise ->
+        AlertDialog(
+            onDismissRequest = { deletingExercise = null },
+            title = { Text("Удалить упражнение?") },
+            text = { Text("«${exercise.name}» будет удалено из программы.") },
+            confirmButton = { TextButton(onClick = { scope.launch { dao.deleteExercise(exercise.id) }; deletingExercise = null }) { Text("Удалить", color = MaterialTheme.colorScheme.error) } },
+            dismissButton = { TextButton(onClick = { deletingExercise = null }) { Text("Отмена") } }
+        )
+    }
+}
+
+"""
+    if marker not in wt: raise SystemExit("Workout start helper marker missing")
+    wt = wt.replace(marker,detail+marker,1)
+workout_screen.write_text(wt)
+
+# Photo deletion: update the media store and expose separate confirmed actions.
+media_store = next(base.rglob("ProfileMediaStore.kt"))
+ms = media_store.read_text()
+if "fun deleteProfile" not in ms:
+    ms = ms.replace(
+        '    fun clearGallery(context: Context) { context.getSharedPreferences("profile_media", Context.MODE_PRIVATE).edit().remove("gallery").apply() }',
+        '''    fun deleteProfile(context: Context) {
+        val prefs = context.getSharedPreferences("profile_media", Context.MODE_PRIVATE)
+        prefs.getString("profile_photo", null)?.let { File(it).delete() }
+        prefs.edit().remove("profile_photo").apply()
+    }
+    fun deleteGalleryPhoto(context: Context, file: File) {
+        val prefs = context.getSharedPreferences("profile_media", Context.MODE_PRIVATE)
+        val values = prefs.getStringSet("gallery", emptySet()).orEmpty().toMutableSet()
+        values.remove(file.absolutePath)
+        prefs.edit().putStringSet("gallery", values).apply()
+        file.delete()
+    }
+    fun clearGallery(context: Context) { context.getSharedPreferences("profile_media", Context.MODE_PRIVATE).edit().remove("gallery").apply() }'''
+    )
+media_store.write_text(ms)
+
+media_file = next(p for p in base.rglob("*.kt") if "fun ProfileMediaPanel()" in p.read_text(errors="ignore"))
+mt = media_file.read_text()
+mt = mt.replace(
+    '    var selectedPhoto by remember { mutableStateOf<File?>(null) }',
+    '    var selectedPhoto by remember { mutableStateOf<File?>(null) }\\n    var confirmDeleteProfile by remember { mutableStateOf(false) }\\n    var confirmDeleteGallery by remember { mutableStateOf<File?>(null) }',
+    1
+)
+mt = mt.replace(
+    'TextButton(onClick = { profilePicker.launch("image/*") }) { Text(if (profile == null) "Добавить фото" else "Изменить фото") }',
+    'Row(verticalAlignment = Alignment.CenterVertically) { TextButton(onClick = { profilePicker.launch("image/*") }) { Text(if (profile == null) "Добавить фото" else "Изменить фото") }; if (profile != null) TextButton(onClick = { confirmDeleteProfile = true }) { Text("Удалить", color = MaterialTheme.colorScheme.error) } }',
+    1
+)
+mt = mt.replace(
+    'rowFiles.forEach { file -> PhotoThumb(file, Modifier.weight(1f).height(116.dp), onClick = { onPhotoClick(file) }) }',
+    'rowFiles.forEach { file -> Box(Modifier.weight(1f)) { PhotoThumb(file, Modifier.fillMaxWidth().height(116.dp), onClick = { onPhotoClick(file) }); IconButton(onClick = { confirmDeleteGallery = file }, modifier = Modifier.align(Alignment.TopEnd)) { Icon(Icons.Default.Delete, "Удалить фото", tint = MaterialTheme.colorScheme.error) } } }',
+    1
+)
+mt = mt.replace(
+    '    selectedPhoto?.let { file -> ProfilePhotoViewer(file) { selectedPhoto = null } }',
+    '''    selectedPhoto?.let { file -> ProfilePhotoViewer(file) { selectedPhoto = null } }
+    if (confirmDeleteProfile) AlertDialog(onDismissRequest = { confirmDeleteProfile = false }, title = { Text("Удалить фото профиля?") }, text = { Text("Фотография профиля будет удалена с устройства.") }, confirmButton = { TextButton(onClick = { ProfileMediaStore.deleteProfile(context); refresh++; confirmDeleteProfile = false }) { Text("Удалить", color = MaterialTheme.colorScheme.error) } }, dismissButton = { TextButton(onClick = { confirmDeleteProfile = false }) { Text("Отмена") } })
+    confirmDeleteGallery?.let { file -> AlertDialog(onDismissRequest = { confirmDeleteGallery = null }, title = { Text("Удалить фотографию?") }, text = { Text("Фотография будет удалена из галереи прогресса.") }, confirmButton = { TextButton(onClick = { ProfileMediaStore.deleteGalleryPhoto(context, file); refresh++; confirmDeleteGallery = null }) { Text("Удалить", color = MaterialTheme.colorScheme.error) } }, dismissButton = { TextButton(onClick = { confirmDeleteGallery = null }) { Text("Отмена") } }) }''',
+    1
+)
+# Ensure gallery delete control also appears in full-gallery dialog by extending its signature and rendering a delete icon.
+mt = mt.replace(
+    'private fun ProfilePhotoGalleryDialog(files: List<File>, onDismiss: () -> Unit, onPhotoClick: (File) -> Unit)',
+    'private fun ProfilePhotoGalleryDialog(files: List<File>, onDismiss: () -> Unit, onPhotoClick: (File) -> Unit, onDeletePhoto: (File) -> Unit)'
+)
+mt = mt.replace(
+    'rowFiles.forEach { file -> PhotoThumb(file, Modifier.weight(1f).height(116.dp), onClick = { onPhotoClick(file) }) }',
+    'rowFiles.forEach { file -> Box(Modifier.weight(1f)) { PhotoThumb(file, Modifier.fillMaxWidth().height(116.dp), onClick = { onPhotoClick(file) }); IconButton(onClick = { onDeletePhoto(file) }, modifier = Modifier.align(Alignment.TopEnd)) { Icon(Icons.Default.Delete, "Удалить фото", tint = MaterialTheme.colorScheme.error) } } }',
+    1
+)
+mt = mt.replace(
+    'ProfilePhotoGalleryDialog(gallery, onDismiss = { showGallery = false }) { selectedPhoto = it }',
+    'ProfilePhotoGalleryDialog(gallery, onDismiss = { showGallery = false }, onPhotoClick = { selectedPhoto = it }, onDeletePhoto = { confirmDeleteGallery = it })',
+    1
+)
+media_file.write_text(mt)
+
+print("DELETE ACTIONS: parameters (including built-in), programs, individual exercises, profile photo and gallery photos now have confirmation dialogs.")
