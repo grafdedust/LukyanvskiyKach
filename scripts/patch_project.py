@@ -289,7 +289,7 @@ gradle_file = next((p for p in gradle_candidates if p.exists()), None)
 if gradle_file is None:
     raise SystemExit("App Gradle file not found")
 gradle_text = gradle_file.read_text()
-match = re.search(r"versionCode\\s*(?:=\\s*)?(\\d+)", gradle_text)
+match = re.search(r"versionCode\s*(?:=\s*)?(\d+)", gradle_text)
 if match:
     old_code = int(match.group(1))
     gradle_text = gradle_text[:match.start(1)] + str(old_code + 1) + gradle_text[match.end(1):]
@@ -297,8 +297,8 @@ else:
     old_code = 1
     if "defaultConfig {" not in gradle_text:
         raise SystemExit("defaultConfig block not found in app Gradle file")
-    gradle_text = gradle_text.replace("defaultConfig {", "defaultConfig {\\n        versionCode = 2\\n        versionName = \"0.9\"", 1)
-name_match = re.search(r'versionName\\s*(?:=\\s*)?"([^"]+)"', gradle_text)
+    gradle_text = gradle_text.replace("defaultConfig {", "defaultConfig {\n        versionCode = 2\n        versionName = \"0.9\"", 1)
+name_match = re.search(r'versionName\s*(?:=\s*)?"([^"]+)"', gradle_text)
 if name_match and match:
     current_name = name_match.group(1)
     parts = current_name.split(".")
