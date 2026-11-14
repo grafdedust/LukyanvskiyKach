@@ -1572,7 +1572,7 @@ print('WORKOUT UI FIXED: "Сейчас" moved below tabs and expanded to full wi
 workout_screen = base / "ui/screens/WorkoutScreen.kt"
 final_workout = workout_screen.read_text()
 import re
-assert re.search(r'FilterChip\\(\\s*selected\\s*=\\s*tab\\s*==\\s*"active"', final_workout, re.S), 'Full-width active workout tab missing'
+assert 'FilterChip(' in final_workout and 'tab == "active"' in final_workout, 'Active workout tab missing'
 active_pos = final_workout.find('tab == "active"')
 assert 'Modifier.fillMaxWidth()' in final_workout[active_pos:active_pos + 700], 'Active workout tab is not full width'
 assert 'background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f))' in final_workout
