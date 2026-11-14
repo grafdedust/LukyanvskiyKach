@@ -773,7 +773,7 @@ image_code = '''                Image(
                     contentDescription = "Схема тела для замеров",
                     modifier = Modifier.weight(0.8f).height(280.dp),
                     contentScale = ContentScale.Fit,
-                    colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.onSurface)
+                    colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(MaterialTheme.colorScheme.onSurface)
                 )'''
 screens_text, image_count = re.subn(canvas_pattern, image_code, screens_text, count=1, flags=re.S)
 if image_count != 1:
