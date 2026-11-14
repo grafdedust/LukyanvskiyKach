@@ -1221,6 +1221,7 @@ if "softDeleteProgram" not in wd:
         '    @Query("UPDATE program_exercises SET deletedAt = :now, updatedAt = :now WHERE id = :id") suspend fun deleteExercise(id: String, now: Long = System.currentTimeMillis())',
         '    @Query("UPDATE program_exercises SET deletedAt = :now, updatedAt = :now WHERE id = :id") suspend fun deleteExercise(id: String, now: Long = System.currentTimeMillis())\n    @Query("UPDATE workout_programs SET deletedAt = :now, updatedAt = :now WHERE id = :id") suspend fun softDeleteProgram(id: String, now: Long = System.currentTimeMillis())\n    @Query("UPDATE program_exercises SET deletedAt = :now, updatedAt = :now WHERE programId = :programId AND deletedAt IS NULL") suspend fun softDeleteProgramExercises(programId: String, now: Long = System.currentTimeMillis())'
     )
+wd = wd.replace("\\n", "\n")
 workout_dao.write_text(wd)
 
 workout_screen = next(base.rglob("WorkoutScreen.kt"))
@@ -1294,6 +1295,7 @@ private fun ProgramDetailsDialog(program: WorkoutProgramEntity, dao: WorkoutDao,
 """
     if marker not in wt: raise SystemExit("Workout start helper marker missing")
     wt = wt.replace(marker,detail+marker,1)
+wt = wt.replace("\\n", "\n")
 workout_screen.write_text(wt)
 
 # Photo deletion: update the media store and expose separate confirmed actions.
