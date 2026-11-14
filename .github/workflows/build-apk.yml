@@ -36,6 +36,22 @@ jobs:
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
           echo "APK_PATH=$PROJECT_DIR/app/build/outputs/apk/debug/app-debug.apk" >> "$GITHUB_ENV"
 
+      - name: Inspect Compose sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          find "$PROJECT_DIR" -type f -name '*.kt' -print
+          while IFS= read -r file; do
+            case "$file" in
+              *LukyanovskyApp.kt|*Screens.kt|*Theme.kt|*Color.kt|*Settings*)
+                echo "===== $file ====="
+                sed -n '1,460p' "$file"
+                ;;
+            esac
+          done < <(find "$PROJECT_DIR" -type f -name '*.kt' | sort)
+          echo "===== PILL DEFINITIONS ====="
+          grep -R -n -E 'fun Pill|Pill\(' "$PROJECT_DIR" --include='*.kt' || true
+
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
