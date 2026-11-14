@@ -418,3 +418,59 @@ else:
 n = n.replace('Text("Создать список")', 'Text("Добавить задачу")')
 n = n.replace('Text("Новая задача")', 'Text("Добавить пункт задачи")')
 notebook.write_text(n)
+
+
+# Correctly apply the user's explicit light/dark choice in Compose. The previous
+# implementation only observed visual_style and ignored the "theme" preference.
+theme_text = theme.read_text()
+old_sig = 'fun KachTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {'
+new_sig = 'fun KachTheme(systemDarkTheme: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {'
+if old_sig in theme_text:
+    theme_text = theme_text.replace(old_sig, new_sig, 1)
+if 'var themeMode by remember' not in theme_text:
+    theme_text = theme_text.replace(
+        '    var style by remember { mutableStateOf(prefs.getString("visual_style", "minimal") ?: "minimal") }',
+        '''    var style by remember { mutableStateOf(prefs.getString("visual_style", "minimal") ?: "minimal") }
+    var themeMode by remember { mutableStateOf(prefs.getString("theme", "dark") ?: "dark") }''', 1
+    )
+theme_text = theme_text.replace(
+    '            if (key == "visual_style") style = shared.getString(key, "minimal") ?: "minimal"',
+    '''            if (key == "visual_style") style = shared.getString(key, "minimal") ?: "minimal"
+            if (key == "theme") themeMode = shared.getString(key, "dark") ?: "dark"''', 1
+)
+theme_text = theme_text.replace(
+    '    val colors = when (style) {',
+    '''    val darkTheme = when (themeMode) {
+        "light" -> false
+        "system" -> systemDarkTheme
+        else -> true
+    }
+    val colors = when (style) {''', 1
+)
+if 'var themeMode by remember' not in theme_text or 'if (key == "theme") themeMode' not in theme_text:
+    raise SystemExit("Theme preference observer patch failed")
+theme.write_text(theme_text)
+
+# Give the dark monochrome identity a matching light palette when Light is selected.
+if '"dark" -> if (darkTheme) TelegramDark else TelegramLight' not in theme_text:
+    raise SystemExit("Monochrome light/dark palette selector missing")
+
+# Make the language preference trigger app locale changes and survive recreation.
+settings_text = settings.read_text()
+if 'AppCompatDelegate.setApplicationLocales' not in settings_text:
+    raise SystemExit("Language selector does not apply Android app locale")
+if 'prefs.edit().putString("language", key).apply()' not in settings_text:
+    raise SystemExit("Language selector does not persist preference")
+
+# Bump to a clearly newer release label, not the old 0.8.1 archive label.
+gradle_text = gradle_file.read_text()
+gradle_text = re.sub(r'versionName\s*(?:=\s*)?"[^"]+"', 'versionName = "0.9.0"', gradle_text, count=1)
+gradle_file.write_text(gradle_text)
+
+# Build-time assertions: fail rather than publish an APK missing these requested fixes.
+assert 'nav.popBackStack("home", inclusive = false)' in app_text, "Home navigation patch missing"
+assert 'fillMaxHeight(0.90f)' in n, "Large note editor patch missing"
+assert 'TextDecoration.LineThrough' in n and 'Checkbox(checked = task.isCompleted' in n, "Task checklist behavior missing"
+assert 'var themeMode by remember' in theme_text and 'TelegramLight' in theme_text, "Theme switching patch missing"
+assert 'setApplicationLocales' in settings_text, "Language locale switch missing"
+print("FEATURE ASSERTIONS: navigation, light/dark palettes, large note editor, checklist and locale selector present.")
