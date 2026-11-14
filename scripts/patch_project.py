@@ -128,4 +128,87 @@ fun KachTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable (
     MaterialTheme(colorScheme = colors, typography = MaterialTheme.typography, content = content)
 }
 ''')
-print("Patched app source: database context, missing icon fallback, three persistent app-wide color styles.")
+
+# Navigation: detail screens always expose a top-right back action. The "More" tab
+# is a true menu root and must not restore a previously opened child destination.
+app_text = app.read_text()
+app_text = app_text.replace(
+    'import androidx.compose.material3.Icon\n',
+    'import androidx.compose.material3.Icon\nimport androidx.compose.material3.IconButton\nimport androidx.compose.material3.TopAppBar\nimport androidx.compose.material.icons.filled.ArrowBack\n'
+)
+app_text = app_text.replace(
+    '            nav.navigate(item.route) {\n                                popUpTo("home") { saveState = true }\n                                launchSingleTop = true\n                                restoreState = true\n                            }',
+    '            if (item.route == "more") {\n                                nav.navigate("more") {\n                                    popUpTo("home") { inclusive = false; saveState = false }\n                                    launchSingleTop = true\n                                    restoreState = false\n                                }\n                            } else {\n                                nav.navigate(item.route) {\n                                    popUpTo("home") { saveState = true }\n                                    launchSingleTop = true\n                                    restoreState = true\n                                }\n                            }'
+)
+old_scaffold = '''    Scaffold(
+        bottomBar = {'''
+new_scaffold = '''    val rootRoutes = setOf("home", "workouts", "profile", "nutrition", "more")
+    Scaffold(
+        topBar = {
+            if (current != null && current !in rootRoutes) {
+                TopAppBar(
+                    title = { Text("") },
+                    actions = {
+                        IconButton(onClick = { if (!nav.popBackStack()) nav.navigate("more") }) {
+                            Icon(Icons.Default.ArrowBack, contentDescription = "Назад")
+                        }
+                    }
+                )
+            }
+        },
+        bottomBar = {'''
+if old_scaffold not in app_text:
+    raise SystemExit("Scaffold anchor missing in LukyanovskyApp.kt")
+app_text = app_text.replace(old_scaffold, new_scaffold, 1)
+app_text = app_text.replace('''                onBackup = { nav.navigate("backup") }
+            ) }''','''            ) }''')
+app_text = app_text.replace('composable("settings") { AppSettingsScreen() }','composable("settings") { AppSettingsScreen(onBackup = { nav.navigate("backup") }) }')
+app.write_text(app_text)
+
+# Backup management belongs under Settings, not in the general More menu.
+screens_text = screens.read_text()
+screens_text = screens_text.replace(
+    'fun MoreScreen(onMedications: () -> Unit, onStatistics: () -> Unit, onSettings: () -> Unit, onNotebook: () -> Unit, onBackup: () -> Unit) {',
+    'fun MoreScreen(onMedications: () -> Unit, onStatistics: () -> Unit, onSettings: () -> Unit, onNotebook: () -> Unit) {'
+)
+screens_text = screens_text.replace('        MenuRow("Резервные копии", onBackup) { Icon(Icons.Default.Settings, null) }\n','')
+screens.write_text(screens_text)
+
+# Settings screen gets a direct entry to backup tools.
+settings_text = settings.read_text()
+settings_text = settings_text.replace('fun AppSettingsScreen() {','fun AppSettingsScreen(onBackup: () -> Unit = {}) {')
+settings_text = settings_text.replace(
+    '        Text("Настройки сохраняются на устройстве и применяются после выбора.',
+    '        OutlinedButton(onClick = onBackup, modifier = Modifier.fillMaxWidth()) { Text("Резервные копии") }\n        Text("Настройки сохраняются на устройстве и применяются после выбора.'
+)
+settings.write_text(settings_text)
+
+# Add a restrained Telegram-like near-black monochrome theme.
+settings_text = settings.read_text()
+settings_text = settings_text.replace(
+    '"tactical" to "Тактикал · графит и олива").forEach',
+    '"tactical" to "Тактикал · графит и олива", "dark" to "Тёмная · монохромная").forEach'
+)
+settings.write_text(settings_text)
+
+theme_text = theme.read_text()
+theme_text = theme_text.replace(
+    'private val TacticalLight = lightColorScheme(',
+    '''private val TelegramDark = darkColorScheme(
+    primary = Color(0xFFE6E6E6), onPrimary = Color(0xFF111111),
+    secondary = Color(0xFFBDBDBD), background = Color(0xFF000000),
+    onBackground = Color(0xFFEAEAEA), surface = Color(0xFF111111),
+    onSurface = Color(0xFFEAEAEA), surfaceVariant = Color(0xFF1B1B1B),
+    onSurfaceVariant = Color(0xFF9A9A9A),
+    outline = Color(0xFF303030)
+)
+private val TacticalLight = lightColorScheme('''
+)
+theme_text = theme_text.replace(
+    '        "tactical" -> if (darkTheme) TacticalDark else TacticalLight\n        else -> if (darkTheme) MinimalDark else MinimalLight',
+    '        "tactical" -> if (darkTheme) TacticalDark else TacticalLight\n        "dark" -> TelegramDark\n        else -> if (darkTheme) MinimalDark else MinimalLight'
+)
+theme.write_text(theme_text)
+
+print("Patched navigation back actions, More menu root behavior, moved backups to Settings, and added monochrome Dark theme.")
+
