@@ -1264,7 +1264,7 @@ if "import androidx.compose.material.icons.filled.Delete" not in wt:
 # Make program title open a dedicated exercise list.
 wt = wt.replace(
     'Text(program.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)',
-    'Text(program.name, modifier = Modifier.fillMaxWidth().clickable { detailProgram = program }, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)',
+    'Text(program.name, modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.primaryContainer).clickable { detailProgram = program }.padding(horizontal = 14.dp, vertical = 12.dp), color = MaterialTheme.colorScheme.onPrimaryContainer, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)',
     1
 )
 # Add a delete action on each program card.
