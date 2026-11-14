@@ -263,3 +263,48 @@ print("Bottom navigation reduced to Home, Workouts, Profile and More; Nutrition 
 
 print("Patched navigation back actions, More menu root behavior, moved backups to Settings, and added monochrome Dark theme.")
 
+
+
+# Settings footer: show the actual installed package version and author.
+settings_text = settings.read_text()
+footer_anchor = '        Text("Настройки сохраняются на устройстве и применяются после выбора. Системный язык и тема используют параметры Android.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)'
+footer_new = '''        Spacer(Modifier.height(12.dp))
+        val appVersion = remember {
+            try {
+                context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "0.9"
+            } catch (_: Exception) { "0.9" }
+        }
+        Text("Версия $appVersion", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("Автор: Царь", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("Настройки сохраняются на устройстве и применяются после выбора. Системный язык и тема используют параметры Android.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)'''
+if footer_anchor not in settings_text:
+    raise SystemExit("Settings footer anchor missing")
+settings.write_text(settings_text.replace(footer_anchor, footer_new, 1))
+
+# Bump Android versionCode while keeping applicationId unchanged so Android
+# installs this APK as an in-place update and preserves app data.
+import re
+gradle_candidates = [root / "app/build.gradle.kts", root / "app/build.gradle"]
+gradle_file = next((p for p in gradle_candidates if p.exists()), None)
+if gradle_file is None:
+    raise SystemExit("App Gradle file not found")
+gradle_text = gradle_file.read_text()
+match = re.search(r"versionCode\\s*(?:=\\s*)?(\\d+)", gradle_text)
+if not match:
+    raise SystemExit("versionCode not found in app Gradle file")
+old_code = int(match.group(1))
+gradle_text = gradle_text[:match.start(1)] + str(old_code + 1) + gradle_text[match.end(1):]
+name_match = re.search(r'versionName\\s*(?:=\\s*)?"([^"]+)"', gradle_text)
+if name_match:
+    current_name = name_match.group(1)
+    parts = current_name.split(".")
+    try:
+        parts[-1] = str(int(parts[-1]) + 1)
+        next_name = ".".join(parts)
+    except ValueError:
+        next_name = current_name + ".1"
+    gradle_text = gradle_text[:name_match.start(1)] + next_name + gradle_text[name_match.end(1):]
+else:
+    gradle_text = re.sub(r"(versionCode\\s*(?:=\\s*)?\\d+)", r'\\1\\n        versionName = "0.9"', gradle_text, count=1)
+gradle_file.write_text(gradle_text)
+print(f"Version bumped: versionCode {old_code} -> {old_code + 1}; package id preserved.")
