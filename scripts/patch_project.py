@@ -2014,3 +2014,77 @@ screens_text = screens_text.replace('$sideLabel', '')
 screens_file.write_text(screens_text)
 assert '$sideLabel' not in screens_text
 print("MEASUREMENT HISTORY: stale side-label reference removed and saved.")
+
+
+# Latest requested workout-card layout:
+# trash icon sits immediately left of Add exercise; Start is a separate full-width action.
+workout_screen = base / "ui/screens/WorkoutScreen.kt"
+wt = workout_screen.read_text()
+old_actions_latest = '''                            OutlinedButton(onClick = { selected = program; showExercise = true }, modifier = Modifier.fillMaxWidth()) {
+                                Text("Добавить упражнение")
+                            }
+                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                                IconButton(onClick = { confirmDeleteProgram = program }) {
+                                    Icon(Icons.Default.Delete, contentDescription = "Удалить программу", tint = MaterialTheme.colorScheme.error)
+                                }
+                                Button(onClick = { scope.launch { startWorkout(dao, program) }; tab = "active" }, enabled = exercises.isNotEmpty(), modifier = Modifier.weight(1f)) { Text("Начать") }
+                            }'''
+new_actions_latest = '''                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                IconButton(onClick = { confirmDeleteProgram = program }) {
+                                    Icon(Icons.Default.Delete, contentDescription = "Удалить программу", tint = MaterialTheme.colorScheme.error)
+                                }
+                                OutlinedButton(
+                                    onClick = { selected = program; showExercise = true },
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text("Добавить упражнение")
+                                }
+                            }
+                            Button(
+                                onClick = { scope.launch { startWorkout(dao, program) }; tab = "active" },
+                                enabled = exercises.isNotEmpty(),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Начать")
+                            }'''
+if old_actions_latest in wt:
+    wt = wt.replace(old_actions_latest, new_actions_latest, 1)
+elif new_actions_latest not in wt:
+    raise SystemExit("Workout card action layout anchor not found; refusing to build with wrong button placement.")
+workout_screen.write_text(wt)
+
+# OpenDocumentTree is Android's Storage Access Framework. Prefer the Google Drive
+# DocumentsProvider root so the picker opens Drive rather than local recent files.
+screens_file = base / "ui/screens/Screens.kt"
+screens_text = screens_file.read_text()
+drive_root_uri = 'Uri.parse("content://com.google.android.apps.docs.storage/document/root")'
+screens_text = screens_text.replace(
+    'connectDriveLauncher.launch(driveTreeUri)',
+    f'connectDriveLauncher.launch(driveTreeUri ?: {drive_root_uri})'
+)
+screens_text = screens_text.replace(
+    'connectDriveLauncher.launch(null)',
+    f'connectDriveLauncher.launch({drive_root_uri})'
+)
+screens_text = screens_text.replace(
+    'Google Drive ещё не подключён. Выберите папку Google Drive один раз.',
+    'Выберите папку на Google Drive. В открывшемся окне должен быть выбран Google Drive, а не локальная память телефона.'
+)
+screens_text = screens_text.replace(
+    'Подключение выполняется через системный выбор папки Android. Выберите папку на Google Drive и подтвердите доступ. Архивы получают уникальные имена и не перезаписывают предыдущие копии.',
+    'Для доступа используется системный выбор папки Android с переходом к корню Google Drive. Выберите папку на Диске и подтвердите доступ. Архивы получают уникальные имена и не перезаписывают предыдущие копии.'
+)
+screens_file.write_text(screens_text)
+
+# Guard the exact requested layout in CI so it cannot silently regress.
+final_workout = workout_screen.read_text()
+trash_pos = final_workout.find('Icon(Icons.Default.Delete, contentDescription = "Удалить программу"')
+add_pos = final_workout.find('Text("Добавить упражнение")')
+start_pos = final_workout.find('Text("Начать")')
+assert trash_pos >= 0 and add_pos > trash_pos, "Trash icon must be to the left of Add exercise"
+assert start_pos > add_pos, "Start button must follow Add exercise"
+start_button_pos = final_workout.rfind('modifier = Modifier.fillMaxWidth()', 0, start_pos)
+assert start_button_pos >= 0 and start_pos - start_button_pos < 250, "Start button must be full width"
+final_backup = screens_file.read_text()
+assert 'content://com.google.android.apps.docs.storage/document/root' in final_backup, "Google Drive root initial URI missing"
+print("LATEST REQUEST VERIFIED: trash left of Add exercise; Start full-width; Drive picker opens at Google Drive provider root.")
