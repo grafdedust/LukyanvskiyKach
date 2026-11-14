@@ -713,3 +713,81 @@ assert 'definitionId = selectedDefinition!!.id' not in screens_text
 assert 'definitionId = definitionToSave.id' in screens_text
 screens.write_text(screens_text)
 print("FIXED: measurement save captures immutable definition; dialog closes after DB write.")
+
+
+# Use the exact user-supplied body silhouette on the dashboard and remove today's plan.
+import xml.sax.saxutils as xml_escape
+import shutil
+
+asset_path = Path(__file__).resolve().parent / "assets" / "body_silhouette.path"
+if not asset_path.exists():
+    raise SystemExit("Supplied body silhouette path asset is missing")
+vector_path = asset_path.read_text().strip()
+drawable_dir = root / "app/src/main/res/drawable"
+drawable_dir.mkdir(parents=True, exist_ok=True)
+vector_xml = """<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="100dp"
+    android:height="254dp"
+    android:viewportWidth="605"
+    android:viewportHeight="1536">
+    <path
+        android:fillColor="@android:color/transparent"
+        android:strokeColor="#FF000000"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="%s" />
+</vector>
+""" % xml_escape.escape(vector_path, {'"': '&quot;'})
+(drawable_dir / "body_silhouette.xml").write_text(vector_xml)
+
+screens_text = screens.read_text()
+if "import androidx.compose.ui.res.painterResource" not in screens_text:
+    screens_text = screens_text.replace(
+        "import androidx.compose.ui.layout.",
+        "import androidx.compose.ui.res.painterResource\nimport androidx.compose.ui.layout.",
+        1
+    ) if "import androidx.compose.ui.layout." in screens_text else screens_text
+if "import androidx.compose.ui.layout.ContentScale" not in screens_text:
+    screens_text = screens_text.replace(
+        "import androidx.compose.ui.res.painterResource",
+        "import androidx.compose.ui.res.painterResource\nimport androidx.compose.ui.layout.ContentScale",
+        1
+    )
+if "import androidx.compose.ui.graphics.ColorFilter" not in screens_text:
+    screens_text = screens_text.replace(
+        "import androidx.compose.ui.res.painterResource",
+        "import androidx.compose.ui.graphics.ColorFilter\nimport androidx.compose.ui.res.painterResource",
+        1
+    )
+if "import androidx.compose.foundation.Image" not in screens_text:
+    screens_text = screens_text.replace(
+        "import androidx.compose.foundation.Canvas",
+        "import androidx.compose.foundation.Image\nimport androidx.compose.foundation.Canvas",
+        1
+    )
+
+canvas_pattern = r'                Canvas\(Modifier\.weight\(0\.8f\)\.height\(280\.dp\)\) \{.*?\n                \}'
+image_code = '''                Image(
+                    painter = painterResource(id = com.lukyanovskykach.R.drawable.body_silhouette),
+                    contentDescription = "Схема тела для замеров",
+                    modifier = Modifier.weight(0.8f).height(280.dp),
+                    contentScale = ContentScale.Fit,
+                    colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.onSurface)
+                )'''
+screens_text, image_count = re.subn(canvas_pattern, image_code, screens_text, count=1, flags=re.S)
+if image_count != 1:
+    raise SystemExit("Dashboard schematic Canvas not found; supplied silhouette not applied")
+
+screens_text = screens_text.replace(
+    '        SectionLabel(stringResource(R.string.today_plan))\n        InfoCard("План на сегодня", "Пока не создан")\n',
+    '',
+    1
+)
+if 'SectionLabel(stringResource(R.string.today_plan))' in screens_text or 'InfoCard("План на сегодня"' in screens_text:
+    raise SystemExit("Today's plan section was not fully removed")
+
+screens.write_text(screens_text)
+assert 'R.drawable.body_silhouette' in screens_text
+assert 'Canvas(Modifier.weight(0.8f).height(280.dp))' not in screens_text
+print("DASHBOARD SILHOUETTE: supplied outline installed as tinted vector drawable. TODAY PLAN: removed.")
