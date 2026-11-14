@@ -660,3 +660,56 @@ screens.write_text(screens_text)
 assert 'latestWeight.recordedAt' not in screens_text
 assert 'import androidx.compose.foundation.Canvas' in screens_text
 print("Compiler fixes applied: removed invalid date property and fixed Canvas imports/colors.")
+
+
+# Prevent crash after saving a measurement: capture the selected definition before
+# launching the database coroutine, then close the dialog only after persistence.
+screens_text = screens.read_text()
+old_callback = '''            onDismiss = { showAddValue = false },
+            onSave = { value, side, note ->
+                scope.launch {
+                    dao.upsertValue(
+                        MeasurementValueEntity(
+                            id = UUID.randomUUID().toString(),
+                            definitionId = selectedDefinition!!.id,
+                            value = value,
+                            side = side,
+                            note = note.ifBlank { null }
+                        )
+                    )
+                }
+                showAddValue = false
+                selectedDefinition = null
+            }'''
+new_callback = '''            onDismiss = {
+                showAddValue = false
+                selectedDefinition = null
+            },
+            onSave = { value, side, note ->
+                val definitionToSave = selectedDefinition
+                if (definitionToSave != null) {
+                    scope.launch {
+                        runCatching {
+                            dao.upsertValue(
+                                MeasurementValueEntity(
+                                    id = UUID.randomUUID().toString(),
+                                    definitionId = definitionToSave.id,
+                                    value = value,
+                                    side = side,
+                                    note = note.ifBlank { null }
+                                )
+                            )
+                        }.onSuccess {
+                            showAddValue = false
+                            selectedDefinition = null
+                        }
+                    }
+                }
+            }'''
+if old_callback not in screens_text:
+    raise SystemExit("Measurement save callback not found exactly; refusing to patch")
+screens_text = screens_text.replace(old_callback, new_callback, 1)
+assert 'definitionId = selectedDefinition!!.id' not in screens_text
+assert 'definitionId = definitionToSave.id' in screens_text
+screens.write_text(screens_text)
+print("FIXED: measurement save captures immutable definition; dialog closes after DB write.")
