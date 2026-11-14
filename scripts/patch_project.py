@@ -809,3 +809,36 @@ if missing_imports:
 screens.write_text(screens_text)
 assert all(line in screens_text for line in required_image_imports)
 print("Compose image imports verified.")
+
+
+# Dashboard layout requested: remove the large top weight card and replace
+# the plan-completion metric with the current weight metric.
+screens_text = screens.read_text()
+dashboard_start = screens_text.index("fun DashboardScreen(database:")
+dashboard_end = screens_text.index("\n}\n\n@Composable", dashboard_start) + 2
+dashboard = screens_text[dashboard_start:dashboard_end]
+
+top_weight_pattern = r'''        Card\(shape = RoundedCornerShape\(22\.dp\), colors = CardDefaults\.cardColors\(containerColor = MaterialTheme\.colorScheme\.surface\)\) \{\s*Column\(Modifier\.fillMaxWidth\(\)\.padding\(20\.dp\), verticalArrangement = Arrangement\.spacedBy\(8\.dp\)\) \{\s*Text\(stringResource\(R\.string\.current_weight\).*?\n        \}\n'''
+dashboard, removed = re.subn(top_weight_pattern, "", dashboard, count=1, flags=re.S)
+if removed != 1:
+    raise SystemExit("Top current-weight card not found; refusing partial dashboard layout patch")
+
+old_metric = 'Box(Modifier.weight(1f)) { MetricCard(stringResource(R.string.plan_completion), "—", "пока нет плана") }'
+new_metric = '''Box(Modifier.weight(1f)) {
+                MetricCard(
+                    "Текущий вес",
+                    latestWeight?.let { "%g".format(java.util.Locale.getDefault(), it.value) } ?: "—",
+                    if (latestWeight == null) "добавьте замер в профиле" else "кг · последний замер"
+                )
+            }'''
+if old_metric not in dashboard:
+    raise SystemExit("Plan completion metric not found; refusing partial dashboard layout patch")
+dashboard = dashboard.replace(old_metric, new_metric, 1)
+if 'stringResource(R.string.plan_completion)' in dashboard:
+    raise SystemExit("Plan completion metric remains in dashboard")
+if 'Text(stringResource(R.string.current_weight)' in dashboard:
+    raise SystemExit("Top weight card remains in dashboard")
+
+screens_text = screens_text[:dashboard_start] + dashboard + screens_text[dashboard_end:]
+screens.write_text(screens_text)
+print("DASHBOARD UPDATED: removed top weight card; replaced plan completion with current weight.")
