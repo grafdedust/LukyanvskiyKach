@@ -949,6 +949,7 @@ seed_block = '''    val dateFmt = remember { SimpleDateFormat("dd.MM.yyyy · HH:
                     ))
                 }
             }
+    }
 
     PageColumn {'''
 if seed_anchor not in workout_text:
