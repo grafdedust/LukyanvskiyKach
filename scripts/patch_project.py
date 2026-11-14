@@ -235,6 +235,30 @@ if nutrition_row not in screens_text:
     screens_text = screens_text.replace(anchor, nutrition_row + anchor, 1)
 screens.write_text(screens_text)
 
+
+# Resolve the moved nutrition menu icon and opt in to the Material3 top app bar API.
+screens_text = screens.read_text()
+if 'import androidx.compose.material.icons.filled.Restaurant' not in screens_text:
+    screens_text = screens_text.replace(
+        'import androidx.compose.material.icons.Icons\\n',
+        'import androidx.compose.material.icons.Icons\\nimport androidx.compose.material.icons.filled.Restaurant\\n'
+    )
+screens.write_text(screens_text)
+
+app_text = app.read_text()
+if 'import androidx.compose.material3.ExperimentalMaterial3Api' not in app_text:
+    app_text = app_text.replace(
+        'import androidx.compose.material3.Icon\\n',
+        'import androidx.compose.material3.Icon\\nimport androidx.compose.material3.ExperimentalMaterial3Api\\n'
+    )
+app_text = app_text.replace(
+    '@Composable\\nfun LukyanovskyApp()',
+    '@OptIn(ExperimentalMaterial3Api::class)\\n@Composable\\nfun LukyanovskyApp()'
+)
+app.write_text(app_text)
+
+print("Fixed moved Nutrition icon import and opted in to Material3 TopAppBar API.")
+
 print("Bottom navigation reduced to Home, Workouts, Profile and More; Nutrition moved into More.")
 
 print("Patched navigation back actions, More menu root behavior, moved backups to Settings, and added monochrome Dark theme.")
