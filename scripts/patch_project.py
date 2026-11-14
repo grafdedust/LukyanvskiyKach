@@ -474,3 +474,161 @@ assert 'TextDecoration.LineThrough' in n and 'Checkbox(checked = task.isComplete
 assert 'var themeMode by remember' in theme_text and 'TelegramLight' in theme_text, "Theme switching patch missing"
 assert 'setApplicationLocales' in settings_text, "Language locale switch missing"
 print("FEATURE ASSERTIONS: navigation, light/dark palettes, large note editor, checklist and locale selector present.")
+
+
+# Live dashboard metrics and body measurement map.
+app_text = app.read_text()
+app_text = app_text.replace(
+    'composable("home") { DashboardScreen(\n                onStartWorkout = { nav.navigate("workouts") },\n                onProfile = { nav.navigate("profile") }\n            ) }',
+    'composable("home") { DashboardScreen(database = database,\n                onStartWorkout = { nav.navigate("workouts") },\n                onProfile = { nav.navigate("profile") }\n            ) }'
+)
+app.write_text(app_text)
+
+screens_text = screens.read_text()
+screens_text = screens_text.replace(
+    'fun DashboardScreen(onStartWorkout: () -> Unit, onProfile: () -> Unit) {',
+    'fun DashboardScreen(database: KachDatabase, onStartWorkout: () -> Unit, onProfile: () -> Unit) {'
+)
+start = screens_text.index('fun DashboardScreen(database:')
+end = screens_text.index('\n}\n\n@Composable', start) + 2
+new_dashboard = '''fun DashboardScreen(database: KachDatabase, onStartWorkout: () -> Unit, onProfile: () -> Unit) {
+    val measurementDao = database.measurementDao()
+    val definitions by measurementDao.observeDefinitions().collectAsState(initial = emptyList())
+    val now = System.currentTimeMillis()
+    val weekStart = now - 7L * 24L * 60L * 60L * 1000L
+    val workoutCount by database.healthDao().workoutCount(weekStart, now).collectAsState(initial = 0)
+    val weightDefinition = definitions.firstOrNull { it.name.equals("Вес", true) }
+    val weightValues by remember(weightDefinition?.id) {
+        if (weightDefinition != null) measurementDao.observeValues(weightDefinition.id)
+        else kotlinx.coroutines.flow.flowOf(emptyList())
+    }.collectAsState(initial = emptyList())
+    val latestWeight = weightValues.firstOrNull()
+    PageColumn {
+        Text("ЛУКЬЯНОВСКИЙ КАЧ", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black)
+        Text(stringResource(R.string.hello), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelMedium)
+        Card(shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+            Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(stringResource(R.string.current_weight), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text(latestWeight?.let { "%g".format(java.util.Locale.getDefault(), it.value) } ?: "—",
+                        style = MaterialTheme.typography.displayMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text(" кг", modifier = Modifier.padding(bottom = 8.dp))
+                }
+                Text(if (latestWeight == null) "Добавьте первое измерение в профиле" else "Последний замер · " + java.text.SimpleDateFormat("dd.MM.yyyy", java.util.Locale.getDefault()).format(java.util.Date(latestWeight.recordedAt)),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Box(Modifier.weight(1f)) { MetricCard(stringResource(R.string.workouts_week), workoutCount.toString(), "за последние 7 дней") }
+            Box(Modifier.weight(1f)) { MetricCard(stringResource(R.string.plan_completion), "—", "пока нет плана") }
+        }
+        SectionLabel("Карта замеров")
+        BodyMeasurementMap(definitions = definitions, database = database)
+        SectionLabel(stringResource(R.string.quick_actions))
+        Button(onClick = onStartWorkout, modifier = Modifier.fillMaxWidth()) {
+            Icon(Icons.Default.FitnessCenter, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.start_workout))
+        }
+        OutlinedButton(onClick = onProfile, modifier = Modifier.fillMaxWidth()) {
+            Icon(Icons.Default.MonitorWeight, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.add_measurement))
+        }
+        SectionLabel(stringResource(R.string.today_plan))
+        InfoCard("План на сегодня", "Пока не создан")
+        SectionLabel(stringResource(R.string.recent_activity))
+        Text(if (workoutCount == 0) stringResource(R.string.empty_state) else "Тренировок за неделю: " + workoutCount,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}'''
+screens_text = screens_text[:start] + new_dashboard + screens_text[end:]
+
+screens_text = screens_text.replace(
+    '                    onClick = { selectedDefinition = definition; showAddValue = true },\n                    onHistory = { selectedDefinition = definition }',
+    '                    database = database,\n                    onClick = { selectedDefinition = definition; showAddValue = true },\n                    onHistory = { selectedDefinition = definition }'
+)
+screens_text = screens_text.replace(
+    'private fun MeasurementDefinitionCard(\n    definition: MeasurementDefinitionEntity,',
+    'private fun MeasurementDefinitionCard(\n    definition: MeasurementDefinitionEntity,\n    database: KachDatabase,'
+)
+pattern = r'Text\(definition\.name, fontWeight = FontWeight\.SemiBold\)\s*Text\(\s*if \(definition\.sideMode == "LEFT_RIGHT".*?\n\s*style = MaterialTheme\.typography\.bodySmall\s*\)'
+replacement = '''Text(definition.name, fontWeight = FontWeight.SemiBold)
+                val values by database.measurementDao().observeValues(definition.id).collectAsState(initial = emptyList())
+                val latest = values.firstOrNull()
+                Text(if (latest == null) "Пока нет замеров · " + definition.unit else "Последнее: " + latest.value + " " + definition.unit,
+                    color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+                Text(if (definition.sideMode == "LEFT_RIGHT") "Левая и правая стороны · " + definition.unit else "Единица: " + definition.unit,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)'''
+screens_text, count = re.subn(pattern, replacement, screens_text, count=1, flags=re.S)
+if count != 1:
+    raise SystemExit("Could not patch profile measurement card latest value")
+
+needle = '''                showAddValue = false
+            }
+        )
+    }
+
+    selectedDefinition?.let'''
+replacement = '''                showAddValue = false
+                selectedDefinition = null
+            }
+        )
+    }
+
+    selectedDefinition?.let'''
+if needle not in screens_text:
+    raise SystemExit("Measurement save callback anchor missing")
+screens_text = screens_text.replace(needle,replacement,1)
+
+body_map = '''
+@Composable
+private fun BodyMeasurementMap(definitions: List<MeasurementDefinitionEntity>, database: KachDatabase) {
+    val dao = database.measurementDao()
+    val labels = listOf("Шея", "Плечи", "Грудь", "Бицепс", "Талия", "Бёдра", "Бедро", "Икра", "Вес")
+    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+        Column(Modifier.fillMaxWidth().padding(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Canvas(Modifier.weight(0.8f).height(280.dp)) {
+                    val cx = size.width * 0.5f
+                    val u = size.width / 180f
+                    val stroke = MaterialTheme.colorScheme.onSurfaceVariant
+                    val body = MaterialTheme.colorScheme.surfaceVariant
+                    drawCircle(body, 19f*u, androidx.compose.ui.geometry.Offset(cx, 24f*u))
+                    drawOval(body, androidx.compose.ui.geometry.Offset(cx-30f*u,45f*u), androidx.compose.ui.geometry.Size(60f*u,105f*u))
+                    drawOval(body, androidx.compose.ui.geometry.Offset(cx-16f*u,140f*u), androidx.compose.ui.geometry.Size(32f*u,78f*u))
+                    drawLine(stroke, androidx.compose.ui.geometry.Offset(cx-30f*u,60f*u), androidx.compose.ui.geometry.Offset(cx-48f*u,112f*u), 5f*u)
+                    drawLine(stroke, androidx.compose.ui.geometry.Offset(cx+30f*u,60f*u), androidx.compose.ui.geometry.Offset(cx+48f*u,112f*u), 5f*u)
+                    drawLine(stroke, androidx.compose.ui.geometry.Offset(cx-48f*u,112f*u), androidx.compose.ui.geometry.Offset(cx-52f*u,132f*u), 4f*u)
+                    drawLine(stroke, androidx.compose.ui.geometry.Offset(cx+48f*u,112f*u), androidx.compose.ui.geometry.Offset(cx+52f*u,132f*u), 4f*u)
+                    drawLine(stroke, androidx.compose.ui.geometry.Offset(cx-12f*u,205f*u), androidx.compose.ui.geometry.Offset(cx-24f*u,258f*u), 7f*u)
+                    drawLine(stroke, androidx.compose.ui.geometry.Offset(cx+12f*u,205f*u), androidx.compose.ui.geometry.Offset(cx+24f*u,258f*u), 7f*u)
+                    drawLine(stroke, androidx.compose.ui.geometry.Offset(cx-30f*u,65f*u), androidx.compose.ui.geometry.Offset(cx+30f*u,65f*u), 2f*u)
+                    drawLine(stroke, androidx.compose.ui.geometry.Offset(cx-25f*u,115f*u), androidx.compose.ui.geometry.Offset(cx+25f*u,115f*u), 2f*u)
+                }
+                Column(Modifier.weight(1.2f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    labels.forEach { label ->
+                        val def = definitions.firstOrNull { it.name.equals(label, true) }
+                        val values by remember(def?.id) {
+                            if (def != null) dao.observeValues(def.id) else kotlinx.coroutines.flow.flowOf(emptyList())
+                        }.collectAsState(initial = emptyList())
+                        val latest = values.firstOrNull()
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text(label, style = MaterialTheme.typography.labelMedium)
+                            Text(if (latest == null) "—" else latest.value.toString() + " " + (def?.unit ?: ""),
+                                style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+'''
+if 'private fun BodyMeasurementMap' not in screens_text:
+    pos=screens_text.index('@Composable\nfun ProfileScreen')
+    screens_text=screens_text[:pos]+body_map+screens_text[pos:]
+
+assert 'workoutCount(weekStart, now)' in screens_text
+assert 'Последнее:' in screens_text
+assert 'BodyMeasurementMap(definitions = definitions, database = database)' in screens_text
+assert 'selectedDefinition = null' in screens_text
+screens.write_text(screens_text)
+print("LIVE DASHBOARD, PROFILE LATEST VALUES, BODY MAP AND SAVE-CLOSE PATCH APPLIED.")
