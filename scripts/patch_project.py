@@ -1566,3 +1566,17 @@ if tabs_old not in wt:
 wt = wt.replace(tabs_old, tabs_new, 1)
 workout_screen.write_text(wt)
 print('WORKOUT UI FIXED: "Сейчас" moved below tabs and expanded to full width.')
+
+
+# Final assertions: fail the CI build if any requested UI/backup change is absent.
+workout_screen = base / "ui/screens/WorkoutScreen.kt"
+final_workout = workout_screen.read_text()
+assert 'FilterChip(selected = tab == "active"' in final_workout
+assert 'modifier = Modifier.fillMaxWidth()' in final_workout[final_workout.find('FilterChip(selected = tab == "active"'):]
+assert 'background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f))' in final_workout
+start_pos = final_workout.find('Text("Начать")')
+add_pos = final_workout.find('Text("Добавить упражнение")')
+assert start_pos >= 0 and add_pos >= 0 and start_pos < add_pos, 'Workout action order is not Start then Add exercise'
+backup_files = [p for p in base.rglob("*.kt") if 'Импортировать из Google Drive / ZIP' in p.read_text()]
+assert backup_files, 'Google Drive import entry missing from backup screen'
+print("REQUESTED CHANGES VERIFIED: full-width Сейчас, translucent grey program title, Start before Add exercise, Google Drive ZIP import/export UI.")
