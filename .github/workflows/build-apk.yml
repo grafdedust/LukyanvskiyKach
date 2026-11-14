@@ -55,9 +55,7 @@ jobs:
                 ;;
             esac
           done < <(find "$PROJECT_DIR" -type f -name '*.kt' | sort)
-          echo "===== RESOURCE XML ====="
-find "$PROJECT_DIR/app/src/main/res" -type f -name "*.xml" -print -exec sed -n '1,240p' {} \;
-echo "===== PILL DEFINITIONS ====="
+          echo "===== PILL DEFINITIONS ====="
           grep -R -n -E 'fun Pill|Pill\(' "$PROJECT_DIR" --include='*.kt' || true
 
       - name: Set up Java
