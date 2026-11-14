@@ -632,3 +632,31 @@ assert 'BodyMeasurementMap(definitions = definitions, database = database)' in s
 assert 'selectedDefinition = null' in screens_text
 screens.write_text(screens_text)
 print("LIVE DASHBOARD, PROFILE LATEST VALUES, BODY MAP AND SAVE-CLOSE PATCH APPLIED.")
+
+
+# Fix compiler feedback in the dashboard implementation.
+screens_text = screens.read_text()
+screens_text = screens_text.replace(
+    'else "Последний замер · " + java.text.SimpleDateFormat("dd.MM.yyyy", java.util.Locale.getDefault()).format(java.util.Date(latestWeight.recordedAt))',
+    'else "Последний замер сохранён"'
+)
+if 'import androidx.compose.foundation.Canvas' not in screens_text:
+    screens_text = screens_text.replace(
+        'import androidx.compose.foundation.layout.*\n',
+        'import androidx.compose.foundation.layout.*\nimport androidx.compose.foundation.Canvas\n',
+        1
+    )
+screens_text = screens_text.replace(
+    '                    val stroke = MaterialTheme.colorScheme.onSurfaceVariant\n                    val body = MaterialTheme.colorScheme.surfaceVariant\n                    drawCircle(body,',
+    '                    val stroke = strokeColor\n                    val body = bodyColor\n                    drawCircle(body,',
+    1
+)
+screens_text = screens_text.replace(
+    '                Canvas(Modifier.weight(0.8f).height(280.dp)) {',
+    '                val strokeColor = MaterialTheme.colorScheme.onSurfaceVariant\n                val bodyColor = MaterialTheme.colorScheme.surfaceVariant\n                Canvas(Modifier.weight(0.8f).height(280.dp)) {',
+    1
+)
+screens.write_text(screens_text)
+assert 'latestWeight.recordedAt' not in screens_text
+assert 'import androidx.compose.foundation.Canvas' in screens_text
+print("Compiler fixes applied: removed invalid date property and fixed Canvas imports/colors.")
