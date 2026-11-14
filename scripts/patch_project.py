@@ -444,6 +444,12 @@ else:
     print("Note editor block not matched; inspect required.")
 n = n.replace('Text("Создать список")', 'Text("Добавить задачу")')
 n = n.replace('Text("Новая задача")', 'Text("Добавить пункт задачи")')
+old_add_task = 'IconButton(onClick = { if (newTask.isNotBlank()) { scope.launch { dao.saveTask(TaskEntity(UUID.randomUUID().toString(), list.id, newTask.trim(), position = tasks.size)) }; newTask = "" } })'
+new_add_task = 'IconButton(onClick = { val taskTitle = newTask.trim(); if (taskTitle.isNotBlank()) { newTask = ""; scope.launch { dao.saveTask(TaskEntity(id = UUID.randomUUID().toString(), listId = list.id, title = taskTitle, position = tasks.size)) } } })'
+if old_add_task not in n:
+    raise SystemExit("Task add handler not found; refusing to publish without fixing async text capture")
+n = n.replace(old_add_task, new_add_task, 1)
+n = n.replace('Text(task.title, modifier = Modifier.weight(1f),', 'Text(task.title.ifBlank { "Пустой пункт, удалите и добавьте заново" }, modifier = Modifier.weight(1f),', 1)
 notebook.write_text(n)
 
 
