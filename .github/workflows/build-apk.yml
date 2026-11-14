@@ -49,9 +49,9 @@ jobs:
           find "$PROJECT_DIR" -type f -name '*.kt' -print
           while IFS= read -r file; do
             case "$file" in
-              *LukyanovskyApp.kt|*Screens.kt|*Theme.kt|*Color.kt|*Settings*)
+              *LukyanovskyApp.kt|*Screens.kt|*Theme.kt|*Color.kt|*Settings*|*NotebookScreen.kt|*strings.xml|*AndroidManifest.xml|*MainActivity.kt)
                 echo "===== $file ====="
-                sed -n '1,460p' "$file"
+                sed -n '1,700p' "$file"
                 ;;
             esac
           done < <(find "$PROJECT_DIR" -type f -name '*.kt' | sort)
