@@ -1342,7 +1342,6 @@ if old_actions not in wt:
     raise SystemExit("Workout action row source not found; refusing layout rewrite")
 wt = wt.replace(old_actions, new_actions, 1)
 wt = wt.replace("\\n", "\n")
-print("WORKOUT_CARD_SOURCE_DEBUG\\n" + wt[max(0, wt.find('Text(program.name')-500):wt.find('Text(program.name')+2600])
 workout_screen.write_text(wt)
 
 # Photo deletion: update the media store and expose separate confirmed actions.
