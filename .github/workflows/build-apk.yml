@@ -97,7 +97,7 @@ jobs:
               -keyalg RSA -keysize 2048 -validity 10000 \
               -dname "CN=Android Debug,O=Android,C=US"
           fi
-          keytool -list -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey
+          keytool -list -v -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey | grep -E "SHA256:|Alias name:|Valid from:"
 
       - name: Build APK
         run: |
