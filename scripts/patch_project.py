@@ -1527,3 +1527,12 @@ for backup_screen in base.rglob("*.kt"):
         break
 else:
     print("BACKUP UI WARNING: could not find existing ZIP backup screen.")
+
+
+# Diagnostic source excerpt for the current-workout action, retained in CI logs.
+for source_file in base.rglob("*.kt"):
+    source_text = source_file.read_text()
+    if "Сейчас" in source_text:
+        p = source_text.find("Сейчас")
+        print("CURRENT-WORKOUT-LABEL-SOURCE:", source_file)
+        print(source_text[max(0, p - 1800):min(len(source_text), p + 1800)])
