@@ -240,20 +240,20 @@ screens.write_text(screens_text)
 screens_text = screens.read_text()
 if 'import androidx.compose.material.icons.filled.Restaurant' not in screens_text:
     screens_text = screens_text.replace(
-        'import androidx.compose.material.icons.Icons\\n',
-        'import androidx.compose.material.icons.Icons\\nimport androidx.compose.material.icons.filled.Restaurant\\n'
+        'import androidx.compose.material.icons.Icons\n',
+        'import androidx.compose.material.icons.Icons\nimport androidx.compose.material.icons.filled.Restaurant\n'
     )
 screens.write_text(screens_text)
 
 app_text = app.read_text()
 if 'import androidx.compose.material3.ExperimentalMaterial3Api' not in app_text:
     app_text = app_text.replace(
-        'import androidx.compose.material3.Icon\\n',
-        'import androidx.compose.material3.Icon\\nimport androidx.compose.material3.ExperimentalMaterial3Api\\n'
+        'import androidx.compose.material3.Icon\n',
+        'import androidx.compose.material3.Icon\nimport androidx.compose.material3.ExperimentalMaterial3Api\n'
     )
 app_text = app_text.replace(
-    '@Composable\\nfun LukyanovskyApp()',
-    '@OptIn(ExperimentalMaterial3Api::class)\\n@Composable\\nfun LukyanovskyApp()'
+    '@Composable\nfun LukyanovskyApp()',
+    '@OptIn(ExperimentalMaterial3Api::class)\n@Composable\nfun LukyanovskyApp()'
 )
 app.write_text(app_text)
 
