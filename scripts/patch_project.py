@@ -2088,3 +2088,130 @@ assert start_button_pos >= 0 and start_pos - start_button_pos < 250, "Start butt
 final_backup = screens_file.read_text()
 assert 'content://com.google.android.apps.docs.storage/document/root' in final_backup, "Google Drive root initial URI missing"
 print("LATEST REQUEST VERIFIED: trash left of Add exercise; Start full-width; Drive picker opens at Google Drive provider root.")
+
+
+# Provider-neutral backup UI: export/import complete ZIP archives without cloud branding.
+screens_file = base / "ui/screens/Screens.kt"
+screens_text = screens_file.read_text()
+backup_start = screens_text.find("@Composable\nfun BackupSettingsScreen()")
+if backup_start < 0:
+    raise SystemExit("BackupSettingsScreen entry point not found")
+backup_end = screens_text.find("\n@Composable", backup_start + 1)
+if backup_end < 0:
+    backup_end = len(screens_text)
+neutral_backup_code = r'''
+@Composable
+fun BackupSettingsScreen() {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var message by remember { mutableStateOf<String?>(null) }
+    var busy by remember { mutableStateOf(false) }
+    var confirmImport by remember { mutableStateOf<Uri?>(null) }
+
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/zip")
+    ) { uri ->
+        if (uri != null) scope.launch {
+            busy = true
+            message = null
+            runCatching {
+                withContext(Dispatchers.IO) { BackupManager.export(context, uri) }
+            }.onSuccess {
+                message = "Резервная копия успешно сохранена."
+            }.onFailure {
+                message = "Ошибка экспорта: \${it.message}"
+            }
+            busy = false
+        }
+    }
+
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) confirmImport = uri
+    }
+
+    PageColumn {
+        Text("Резервное копирование", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        Text(
+            "Полная копия данных приложения в ZIP-архиве. Архив можно сохранить в память устройства или любое доступное хранилище.",
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+            Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Экспорт данных", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleLarge)
+                Text(
+                    "Сохранить базу данных, тренировки, упражнения, питание, препараты, настройки и фотографии в один архив.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Button(
+                    onClick = { exportLauncher.launch("LukyanovskyKach_backup_\${System.currentTimeMillis()}.zip") },
+                    enabled = !busy,
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Создать резервную копию") }
+            }
+        }
+
+        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+            Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Импорт данных", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleLarge)
+                Text(
+                    "Выбрать ранее сохранённый ZIP-архив и восстановить из него данные приложения.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                OutlinedButton(
+                    onClick = { importLauncher.launch(arrayOf("application/zip", "application/octet-stream", "application/x-zip-compressed")) },
+                    enabled = !busy,
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Выбрать архив для восстановления") }
+            }
+        }
+
+        if (busy) CircularProgressIndicator()
+        message?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
+    }
+
+    confirmImport?.let { uri ->
+        AlertDialog(
+            onDismissRequest = { confirmImport = null },
+            title = { Text("Восстановить данные?") },
+            text = { Text("Текущая база данных и связанные файлы будут заменены содержимым выбранного архива. Перед продолжением убедитесь, что у вас есть актуальная резервная копия.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmImport = null
+                    scope.launch {
+                        busy = true
+                        message = null
+                        runCatching {
+                            withContext(Dispatchers.IO) { BackupManager.import(context, uri) }
+                        }.onSuccess {
+                            message = "Импорт завершён. Данные и фотографии восстановлены."
+                        }.onFailure {
+                            message = "Ошибка импорта: \${it.message}"
+                        }
+                        busy = false
+                    }
+                }) { Text("Восстановить") }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmImport = null }) { Text("Отмена") }
+            }
+        )
+    }
+}
+'''
+screens_text = screens_text[:backup_start] + neutral_backup_code + screens_text[backup_end:]
+screens_file.write_text(screens_text)
+
+neutral_start = screens_text.find("@Composable\nfun BackupSettingsScreen()")
+neutral_end = screens_text.find("\n@Composable", neutral_start + 1)
+if neutral_end < 0: neutral_end = len(screens_text)
+neutral_body = screens_text[neutral_start:neutral_end]
+for forbidden in ["Google Drive", "google drive", "driveTreeUri", "connectDriveLauncher", "Найти последнюю копию"]:
+    assert forbidden not in neutral_body, f"Cloud-specific UI remains: {forbidden}"
+assert 'ActivityResultContracts.CreateDocument("application/zip")' in neutral_body
+assert 'ActivityResultContracts.OpenDocument()' in neutral_body
+assert 'BackupManager.export(context, uri)' in neutral_body
+assert 'BackupManager.import(context, uri)' in neutral_body
+print("BACKUP REDESIGNED: neutral ZIP export/import; cloud references removed from screen.")
